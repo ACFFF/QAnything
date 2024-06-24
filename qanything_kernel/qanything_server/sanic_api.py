@@ -1,7 +1,6 @@
 import sys
 import os
 import time
-import webbrowser
 
 # 获取当前脚本的绝对路径
 current_script_path = os.path.abspath(__file__)
@@ -64,9 +63,6 @@ args = parser.parse_args()
 print('use_cpu:', args.use_cpu, flush=True)
 print('use_openai_api:', args.use_openai_api, flush=True)
 
-# 输出用户启动的端口
-print(f"The server is starting on port: {args.port}")
-
 if os_system != 'Darwin':
     if not args.use_cpu:
         cuda_version = torch.version.cuda
@@ -91,7 +87,7 @@ if os_system != 'Darwin':
         if not check_package_version("onnxruntime", "1.16.3"):
             print(f"当前系统glibc版本为{glibc_version}<2.28，无法使用onnxruntime-gpu(cuda12.x)，将安装onnxruntime来代替", flush=True)
             os.system("pip install onnxruntime")
-    elif not args.use_cpu:
+    else:
         # 官方发布的1.17.1不支持cuda12以上的系统，需要根据官方文档:https://onnxruntime.ai/docs/install/里提到的地址手动下载whl
         if not check_package_version("onnxruntime-gpu", "1.17.1"):
             download_url = f"https://aiinfra.pkgs.visualstudio.com/PublicPackages/_apis/packaging/feeds/9387c3aa-d9ad-4513-968c-383f6f7f53b8/pypi/packages/onnxruntime-gpu/versions/1.17.1/onnxruntime_gpu-1.17.1-cp3{python3_version}-cp3{python3_version}-{system_name}.whl/content"
@@ -206,20 +202,7 @@ async def init_local_doc_qa(app, loop):
 
 @app.after_server_start
 async def print_info(app, loop):
-    print(f"已启动后端服务，请复制[  http://0.0.0.0:{args.port}/qanything/  ]到浏览器进行测试。", flush=True)
-    print("详细调试日志请查看 logs/debug_logs/debug.log，问答日志请查看logs/qa_logs/qa.log", flush=True)
-    # os.system("tail -f logs/debug_logs/debug.log")
-
-# 启动服务器并尝试自动打开浏览器的函数
-@app.after_server_start
-async def start_server_and_open_browser(app, loop):
-    try:
-        print(f"Opening browser at http://{args.host}:{args.port}/qanything/")
-        webbrowser.open(f"http://{args.host}:{args.port}/qanything/")
-    except Exception as e:
-        # 记录或处理任何异常
-        print(f"Failed to open browser: {e}")
-
+    print("已启动后端服务，请复制[  http://0.0.0.0:8777/qanything/  ]到浏览器进行测试。", flush=True)
 
 app.add_route(document, "/api/docs", methods=['GET'])
 app.add_route(new_knowledge_base, "/api/local_doc_qa/new_knowledge_base", methods=['POST'])  # tags=["新建知识库"]
@@ -241,7 +224,6 @@ app.add_route(upload_faqs, "/api/local_doc_qa/upload_faqs", methods=['POST'])  #
 app.add_route(get_file_base64, "/api/local_doc_qa/get_file_base64", methods=['POST'])  # tags=["获取文件base64"]
 app.add_route(get_qa_info, "/api/local_doc_qa/get_qa_info", methods=['POST'])  # tags=["获取QA信息"]
 
-
 if __name__ == "__main__":
     # if args.use_openai_api:
     #     try:
@@ -256,4 +238,7 @@ if __name__ == "__main__":
     #     app.run(host=args.host, port=args.port, single_process=True, access_log=False)
     # 由于有用户启动时上下文环境报错，使用单进程模式：
     app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+
+
+
 

@@ -249,7 +249,12 @@ class KnowledgeBaseManager:
         if not self.check_user_exist_(user_id):
             self.add_user_(user_id, user_name)
         query = "INSERT INTO KnowledgeBase (kb_id, user_id, kb_name) VALUES (?, ?, ?)"
-        self.execute_query_(query, (kb_id, user_id, kb_name), commit=True)
+        try:
+            self.execute_query_(query, (kb_id, user_id, kb_name), commit=True)
+        except Exception as e:
+            print(e)
+            debug_logger.error("new_knowledge_base error: {}".format(e))
+            return None, "failed"
         return kb_id, "success"
 
     def new_qanything_bot(self, bot_id, user_id, bot_name, description, head_image, prompt_setting, welcome_message, model, kb_ids_str):
@@ -277,15 +282,19 @@ class KnowledgeBaseManager:
     # [知识库] 删除指定知识库
     def delete_knowledge_base(self, user_id, kb_ids):
         # 使用参数化查询
-        placeholders = ','.join(['?'] * len(kb_ids))
-        query = "UPDATE KnowledgeBase SET deleted = 1 WHERE user_id = ? AND kb_id IN ({})".format(placeholders)
-        query_params = [user_id] + kb_ids
-        self.execute_query_(query, query_params, commit=True)
+        try:
+            placeholders = ','.join(['?'] * len(kb_ids))
+            query = "UPDATE KnowledgeBase SET deleted = 1 WHERE user_id = ? AND kb_id IN ({})".format(placeholders)
+            query_params = [user_id] + kb_ids
+            self.execute_query_(query, query_params, commit=True)
 
-        # 更新文件的删除状态也需要使用参数化查询
-        query = "UPDATE File SET deleted = 1 WHERE kb_id IN ({}) AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?)".format(placeholders)
-        debug_logger.info("delete_knowledge_base: {}".format(kb_ids))
-        self.execute_query_(query, query_params, commit=True)
+            # 更新文件的删除状态也需要使用参数化查询
+            query = "UPDATE File SET deleted = 1 WHERE kb_id IN ({}) AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?)".format(placeholders)
+            debug_logger.info("delete_knowledge_base: {}".format(kb_ids))
+            self.execute_query_(query, query_params, commit=True)
+        except Exception as e:
+            debug_logger.error("delete_knowledge_base: {}".format(e))
+
 
     def delete_bot(self, user_id, bot_id):
         # 使用参数化查询
@@ -310,6 +319,28 @@ class KnowledgeBaseManager:
         query = "INSERT INTO File (file_id, kb_id, file_name, status, timestamp) VALUES (?, ?, ?, ?, ?)"
         self.execute_query_(query, (file_id, kb_id, file_name, status, timestamp), commit=True)
         debug_logger.info("add_file: {}".format(file_id))
+        return file_id, "success"
+    
+    # [文件] 向指定知识库下面增加文件
+    def add_fileid(self, user_id, kb_id, file_id, file_name, timestamp, status="gray"):
+        # 如果他传回来了一个id, 那就说明这个表里肯定有
+        if not self.check_user_exist_(user_id):
+            return None, "invalid user_id, please check..."
+        not_exist_kb_ids = self.check_kb_exist(user_id, [kb_id])
+        if not_exist_kb_ids:
+            return None, f"invalid kb_id, please check {not_exist_kb_ids}"
+        
+        not_exist_file_id = self.check_file_exist(user_id, kb_id, [file_id])
+        if len(not_exist_file_id)>0:
+            return None, f"file_id is exist, please check {not_exist_file_id}"
+        
+        try:
+            query = "INSERT INTO File (file_id, kb_id, file_name, status, timestamp) VALUES (?, ?, ?, ?, ?)"
+            self.execute_query_(query, (file_id, kb_id, file_name, status, timestamp), commit=True)
+            debug_logger.info("add_file: {}".format(file_id))
+        except Exception as e:
+            debug_logger.error("add_file: {}".format(e))
+            return None, "file_id already exist"
         return file_id, "success"
 
     def add_qalog(self, user_id, bot_id, kb_ids, query, model, product_source, time_record, history, condense_question,
@@ -437,6 +468,14 @@ class KnowledgeBaseManager:
     # [文件] 获取指定知识库下面所有文件的id和名称
     def get_files(self, user_id, kb_id):
         query = "SELECT file_id, file_name, status, file_size, content_length, timestamp FROM File WHERE kb_id = ? AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?) AND deleted = 0"
+        return self.execute_query_(query, (kb_id, user_id), fetch=True)
+    
+    # [文件] 获取指定知识库下面指定文件的id和名称
+    def get_files_info(self, user_id, kb_id, file_ids):
+        file_ids_str = ','.join("'{}'".format(str(x)) for x in file_ids)
+        query = "SELECT file_id, file_name, status, file_size, content_length, timestamp FROM File WHERE kb_id = ? AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?) AND file_id IN ({}) AND deleted = 0".format(
+            file_ids_str)
+        
         return self.execute_query_(query, (kb_id, user_id), fetch=True)
 
     def get_file_path(self, file_id):
