@@ -1,26 +1,27 @@
 from transformers import AutoTokenizer
 from copy import deepcopy
 from typing import List
-from qanything_kernel.configs.model_config import LOCAL_RERANK_MODEL_PATH, LOCAL_RERANK_MAX_LENGTH, \
+from qanything_kernel.configs.model_config import LOCAL_RERANK_MAX_LENGTH, \
     LOCAL_RERANK_MODEL_NAME, \
-    LOCAL_RERANK_BATCH, LOCAL_RERANK_PATH, LOCAL_RERANK_REPO, LOCAL_RERANK_WORKERS
+    LOCAL_RERANK_BATCH, LOCAL_RERANK_PATH, LOCAL_RERANK_WORKERS
 from qanything_kernel.utils.custom_log import debug_logger
 from qanything_kernel.utils.general_utils import get_time
-from modelscope import snapshot_download
 from abc import ABC, abstractmethod
-import subprocess
-import os
 import concurrent.futures
 
 # 如果模型不存在, 下载模型
-if not os.path.exists(LOCAL_RERANK_MODEL_PATH):
-    # snapshot_download(repo_id=LOCAL_RERANK_REPO, local_dir=LOCAL_RERANK_PATH, local_dir_use_symlinks="auto")
-    debug_logger.info(f"开始下载rerank模型：{LOCAL_RERANK_REPO}")
-    cache_dir = snapshot_download(model_id=LOCAL_RERANK_REPO)
-    # 如果存在的话，删除LOCAL_EMBED_PATH
-    os.system(f"rm -rf {LOCAL_RERANK_PATH}")
-    output = subprocess.check_output(['ln', '-s', cache_dir, LOCAL_RERANK_PATH], text=True)
-    debug_logger.info(f"模型下载完毕！cache地址：{cache_dir}, 软链接地址：{LOCAL_RERANK_PATH}")
+# import os
+# import subprocess
+# from modelscope import snapshot_download
+# from qanything_kernel.configs.model_config import LOCAL_RERANK_MODEL_PATH, LOCAL_RERANK_REPO
+# if not os.path.exists(LOCAL_RERANK_MODEL_PATH):
+#     # snapshot_download(repo_id=LOCAL_RERANK_REPO, local_dir=LOCAL_RERANK_PATH, local_dir_use_symlinks="auto")
+#     debug_logger.info(f"开始下载rerank模型：{LOCAL_RERANK_REPO}")
+#     cache_dir = snapshot_download(model_id=LOCAL_RERANK_REPO)
+#     # 如果存在的话，删除LOCAL_EMBED_PATH
+#     os.system(f"rm -rf {LOCAL_RERANK_PATH}")
+#     output = subprocess.check_output(['ln', '-s', cache_dir, LOCAL_RERANK_PATH], text=True)
+#     debug_logger.info(f"模型下载完毕！cache地址：{cache_dir}, 软链接地址：{LOCAL_RERANK_PATH}")
 
 
 class RerankBackend(ABC):
@@ -67,8 +68,6 @@ class RerankBackend(ABC):
             passage_inputs_length = len(passage_inputs['input_ids'])
 
             if passage_inputs_length <= max_passage_inputs_length:
-                if passage_inputs['attention_mask'] is None or len(passage_inputs['attention_mask']) == 0:
-                    continue
                 qp_merge_inputs = self.merge_inputs(query_inputs, passage_inputs)
                 merge_inputs.append(qp_merge_inputs)
                 merge_inputs_idxs.append(pid)
@@ -86,7 +85,10 @@ class RerankBackend(ABC):
         return merge_inputs, merge_inputs_idxs
 
     @get_time
-    def get_rerank(self, query: str, passages: List[str]):
+    def predict(self,
+                query: str,
+                passages: List[str],
+                ):
         tot_batches, merge_inputs_idxs_sort = self.tokenize_preproc(query, passages)
 
         tot_scores = []

@@ -7,22 +7,31 @@ import torch
 
 
 class RerankTorchBackend(RerankBackend):
-    def __init__(self, use_cpu: bool = False):
+    def __init__(self, use_cpu: bool = False, device: str = "cpu"):
         super().__init__(use_cpu)
         self.return_tensors = "pt"
+        self.device = device
         self._model = AutoModelForSequenceClassification.from_pretrained(LOCAL_RERANK_PATH,
                                                                          return_dict=False)
-        # if use_cpu or not torch.backends.mps.is_available():
-        #     self.device = torch.device('cpu')
-        #     self._model = self._model.to(self.device)
-        # else:
-        #     self.device = torch.device('mps')
-        #     self._model = self._model.to(self.device)
-        self.device = torch.device('cpu')
-        self._model = self._model.to(self.device)
+        if use_cpu:
+            self.device = torch.device('cpu')
+            self._model = self._model.to(self.device)
+        else:
+            if 'npu' in device:
+                import torch_npu
+                self.device = device
+                torch_npu.npu.set_device(self.device)
+                self._model = self._model.to(self.device)
+            else:
+                debug_logger.error("Unsupported device: {}".format(device))
+                raise NotImplementedError
+        
         print("rerank device:", self.device)
 
     def inference(self, batch):
+        if 'npu' in self.device:
+            import torch_npu
+            torch_npu.npu.set_device(self.device)
         # 准备输入数据
         inputs = {k: v.to(self.device) for k, v in batch.items()}
 

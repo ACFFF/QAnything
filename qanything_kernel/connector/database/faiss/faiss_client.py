@@ -49,6 +49,7 @@ class FaissClient:
         self.kb_ids: List[str] = []
 
     def _load_kb_to_memory(self, kb_ids):
+        debug_logger.info(f'_load_kb_to_memory kb_ids: {kb_ids}')
         self.kb_ids = kb_ids
         self.faiss_client = None
         for kb_id in kb_ids:

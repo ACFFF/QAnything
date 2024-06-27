@@ -8,21 +8,31 @@ import torch
 
 
 class EmbeddingTorchBackend(EmbeddingBackend):
-    def __init__(self, use_cpu: bool = False):
+    def __init__(self, use_cpu: bool = False, device: str = "cpu"):
         super().__init__(use_cpu)
         self.return_tensors = "pt"
+        self.device = device
         self._model = AutoModel.from_pretrained(LOCAL_EMBED_PATH, return_dict=False)
-        # if use_cpu or not torch.backends.mps.is_available():
-        #     self.device = torch.device('cpu')
-        #     self._model = self._model.to(self.device)
-        # else:
-        #     self.device = torch.device('mps')
-        #     self._model = self._model.to(self.device)
-        self.device = torch.device('cpu')
-        self._model = self._model.to(self.device)
+        
+        if use_cpu:
+            self.device = torch.device('cpu')
+            self._model = self._model.to(self.device)
+        else:
+            if 'npu' in device:
+                import torch_npu
+                self.device = device
+                torch_npu.npu.set_device(self.device)                
+                self._model = self._model.to(self.device)
+            else:
+                debug_logger.error("Unsupported device: {}".format(device))
+                raise NotImplementedError
+            
         print("embedding device:", self.device)
 
     def get_embedding(self, sentences, max_length):
+        if 'npu' in self.device:
+            import torch_npu
+            torch_npu.npu.set_device(self.device)
         inputs_pt = self._tokenizer(sentences, padding=True, truncation=True, max_length=max_length,
                                     return_tensors=self.return_tensors)
         inputs_pt = {k: v.to(self.device) for k, v in inputs_pt.items()}

@@ -1,7 +1,6 @@
 import os
 import nltk
 import platform
-import config
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -11,15 +10,15 @@ os_system = platform.system()
 # 默认的CUDA设备
 CUDA_DEVICE = '0'
 # 设置是否使用快速PDF解析器，设置为False时，使用优化后的PDF解析器，但速度下降
-USE_FAST_PDF_PARSER = config.pdf_config['USE_FAST_PDF_PARSER']
+USE_FAST_PDF_PARSER = True
 # 设置rerank的batch大小，16GB内存建议设置为8，32GB内存建议设置为16
-LOCAL_RERANK_BATCH = config.user_defined_configuration['LOCAL_RERANK_BATCH']
+LOCAL_RERANK_BATCH = 8
 # 设置rerank的多线程worker数量，默认设置为4，根据机器性能调整
-LOCAL_RERANK_WORKERS = config.user_defined_configuration['LOCAL_RERANK_WORKERS']
+LOCAL_RERANK_WORKERS = 4
 # 设置embed的batch大小，16GB内存建议设置为8，32GB内存建议设置为16
-LOCAL_EMBED_BATCH = config.user_defined_configuration['LOCAL_EMBED_BATCH']
+LOCAL_EMBED_BATCH = 8
 # 设置embed的多线程worker数量，默认设置为4，根据机器性能调整
-LOCAL_EMBED_WORKERS = config.user_defined_configuration['LOCAL_EMBED_WORKERS']
+LOCAL_EMBED_WORKERS = 4
 #### 用户配置区 ####
 
 # 获取项目根目录
@@ -58,20 +57,19 @@ PROMPT_TEMPLATE = """参考信息：
 QUERY_PROMPT_TEMPLATE = """{question}"""
 
 # 文本分句长度
-SENTENCE_SIZE = config.model_config['SENTENCE_SIZE']
+SENTENCE_SIZE = 100
 
 # 匹配后单段上下文长度
-CHUNK_SIZE = config.model_config['CHUNK_SIZE']
+CHUNK_SIZE = 800
 
 # 传入LLM的历史记录长度
-# 看起来暂时是没有用的
-# LLM_HISTORY_LEN = 3
+LLM_HISTORY_LEN = 3
 
 # 知识库检索时返回的匹配内容条数
-VECTOR_SEARCH_TOP_K = config.model_config['VECTOR_SEARCH_TOP_K']
+VECTOR_SEARCH_TOP_K = 40
 
 # embedding检索的相似度阈值，归一化后的L2距离，设置越大，召回越多，设置越小，召回越少
-VECTOR_SEARCH_SCORE_THRESHOLD = config.model_config['VECTOR_SEARCH_SCORE_THRESHOLD']
+VECTOR_SEARCH_SCORE_THRESHOLD = 1.1
 
 # NLTK_DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "nltk_data")
 # print('NLTK_DATA_PATH', NLTK_DATA_PATH)
@@ -104,7 +102,8 @@ FAISS_CACHE_SIZE = 10
 # LOCAL_LLM_MODEL_NAME = llm_api_serve_model
 # LOCAL_LLM_MAX_LENGTH = 4096
 
-LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
+LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'bce-reranker-base_v1')
+# LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_RERANK_REPO = "maidalun/bce-reranker-base_v1"
     LOCAL_RERANK_MODEL_PATH = os.path.join(LOCAL_RERANK_PATH, "pytorch_model.bin")
@@ -115,7 +114,8 @@ print('LOCAL_RERANK_REPO:', LOCAL_RERANK_REPO)
 LOCAL_RERANK_MODEL_NAME = 'rerank'
 LOCAL_RERANK_MAX_LENGTH = 512
 
-LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
+LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'bce-embedding-base_v1')
+# LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_EMBED_REPO = "maidalun/bce-embedding-base_v1"
     LOCAL_EMBED_MODEL_PATH = os.path.join(LOCAL_EMBED_PATH, "pytorch_model.bin")
