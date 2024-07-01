@@ -20,15 +20,18 @@ update_or_append_to_env() {
 system="Linux"
 milvus_port=19530
 qanything_port=8777
-use_cpu=false
-
+device="cpu"
+device_id=0
+workers=1
 
 # 使用getopts解析命令行参数
-while getopts ":q:c:w:" opt; do
+while getopts ":q:d:i:w:" opt; do
   case $opt in
     q) qanything_port="$OPTARG"
     ;;
-    c) use_cpu=true
+    d) device="$OPTARG"
+    ;;
+    i) device_id="$OPTARG"
     ;;
     w) workers="$OPTARG"
     ;;
@@ -46,26 +49,15 @@ fi
 
 
 
-if [ "$use_cpu" = true ]; then
-    use_cpu_option="--use_cpu"
-else
-    use_cpu_option=""
-fi
-
-
 echo -e "即将启动后端服务"
 echo "运行qanything-server的命令是："
-echo "CUDA_VISIBLE_DEVICES=0 python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port --model_size  ${workers:+--workers "$workers"}"
+echo "CUDA_VISIBLE_DEVICES=$device_id python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port --workers $workers --device $device --device_id $device_id"
 
 sleep 1
 # 启动qanything-server服务
-CUDA_VISIBLE_DEVICES=0 python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port \
-    $use_cpu_option \
-    ${workers:+--workers "$workers"}
-
-# nohup CUDA_VISIBLE_DEVICES=0 python3 -m qanything_kernel.qanything_server.sanic_api_liaoning --host 0.0.0.0 --port $qanything_port \
-#     $use_cpu_option \
-#     ${workers:+--workers "$workers"} > test0608.log 2>&1 &
+python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port \
+    --device $device --device_id $device_id --workers $workers
+    
 
 
 # echo -e "即将启动Milvus服务"

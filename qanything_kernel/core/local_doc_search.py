@@ -30,7 +30,6 @@ class LocalDocSearch:
         self.local_rerank_backend: RerankBackend = None
         self.ocr_reader: OCRQAnything = None
         self.mode: str = None
-        self.use_cpu: bool = True
         self.model: str = None
 
     def get_ocr_result(self, input: dict):
@@ -44,20 +43,27 @@ class LocalDocSearch:
         res = [line for line in ocr_res if line]
         return res
 
-    def init_cfg(self, args=None):
-        self.rerank_top_k = 7 # int(args.model_size[0])
-        self.use_cpu = args.use_cpu
+    def init_cfg(self, args):
+        self.rerank_top_k = 5
         self.device = args.device
-        if "cuda" in self.device:       # platform.system() == 'Linux':
+        if "gpu" == self.device:
             from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
             from qanything_kernel.connector.embedding.embedding_onnx_backend import EmbeddingOnnxBackend
-            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(self.use_cpu)
-            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(self.use_cpu)
-        elif "npu" in self.device:
+            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(use_cpu=False)
+            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(use_cpu=False)
+        elif "cpu" == self.device:
+            from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
+            from qanything_kernel.connector.embedding.embedding_onnx_backend import EmbeddingOnnxBackend
+            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(use_cpu=True)
+            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(use_cpu=True)
+        elif "npu" == self.device:
             from qanything_kernel.connector.rerank.rerank_torch_backend import RerankTorchBackend
             from qanything_kernel.connector.embedding.embedding_torch_backend import EmbeddingTorchBackend
-            self.local_rerank_backend: RerankTorchBackend = RerankTorchBackend(use_cpu=self.use_cpu, device=self.device+":"+str(args.device_id))
-            self.embeddings: EmbeddingTorchBackend = EmbeddingTorchBackend(use_cpu=self.use_cpu, device=self.device+":"+str(args.device_id))
+            self.local_rerank_backend: RerankTorchBackend = RerankTorchBackend(use_cpu=False, device=self.device+":"+str(args.device_id))
+            self.embeddings: EmbeddingTorchBackend = EmbeddingTorchBackend(use_cpu=False, device=self.device+":"+str(args.device_id))
+        else:
+            debug_logger.info(f"error input device: {self.device}")
+            raise ValueError(f"error input device: {self.device}")
         self.mysql_client = KnowledgeBaseManager()
         self.ocr_reader = OCRQAnything(model_dir=OCR_MODEL_PATH, device="cpu")  # 省显存
         debug_logger.info(f"OCR DEVICE: {self.ocr_reader.device}")

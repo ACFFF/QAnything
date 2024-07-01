@@ -41,13 +41,9 @@ import subprocess
 parser.add_argument('--host', dest='host', default='0.0.0.0', help='set host for qanything server')
 parser.add_argument('--port', dest='port', default=8777, type=int, help='set port for qanything server')
 parser.add_argument('--workers', dest='workers', default=4, type=int, help='sanic server workers number')
-# 是否使用GPU
-parser.add_argument('--use_cpu', dest='use_cpu', action='store_true', help='use gpu')
-parser.add_argument('--device', dest='device', default='npu', help='显卡设备')
+parser.add_argument('--device', dest='device', default='npu', help='显卡设备，可以设置为npu, gpu, cpu')
 parser.add_argument('--device_id', dest='device_id', default='0', help='cuda device id for qanything server')
 args = parser.parse_args()
-
-print('use_cpu:', args.use_cpu, flush=True)
 
 
 # if os_system != 'Darwin':
@@ -167,16 +163,16 @@ app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # ta
 
 if __name__ == "__main__":
     
-    # try:
-    #     # 尝试以指定的workers数量启动应用
-    #     app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
-    # except Exception as e:
-    #     debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
-    #     # 如果出现异常，则退回到单进程模式
-    #     app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    try:
+        # 尝试以指定的workers数量启动应用
+        app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
+    except Exception as e:
+        debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
+        # 如果出现异常，则退回到单进程模式
+        app.run(host=args.host, port=args.port, single_process=True, access_log=False)
     
     # 由于有用户启动时上下文环境报错，使用单进程模式：
-    app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    # app.run(host=args.host, port=args.port, single_process=True, access_log=False)
 
 
 
