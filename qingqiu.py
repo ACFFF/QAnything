@@ -4,20 +4,9 @@ import requests
 
 function_list=["document", "new_knowledge_base", "document_parser", "document_parser_embedding", "delete_knowledge_base", "question_rag_search",
            "list_kbs", "list_docs", "delete_docs", "get_total_status", "upload_faqs", "get_qa_info", "get_files_statu", "chunk_embedding"]
+question=""
 
 
-# app.add_route(document, "/api/docs", methods=['GET'])   # tags=["接口文档"]
-# app.add_route(new_knowledge_base, "/api/qanything/new_knowledge_base", methods=['POST'])  # tags=["新建知识库"]
-# app.add_route(delete_knowledge_base, "/api/qanything/delete_knowledge_base", methods=['POST'])  # tags=["删除知识库"] 
-# app.add_route(document_parser, "/api/qanything/document_parser", methods=['POST'])  # tags=["解析文件"]
-# app.add_route(document_parser_embedding, "/api/qanything/document_parser_embedding", methods=['POST'])  # tags=["解析文件并保存"]
-# app.add_route(delete_docs, "/api/qanything/delete_files", methods=['POST'])  # tags=["删除文件"]
-# app.add_route(question_rag_search, "/api/qanything/question_rag_search", methods=['POST'])  # tags=["问答接口"]
-# app.add_route(list_kbs, "/api/qanything/list_knowledge_base", methods=['POST'])  # tags=["知识库列表"] 
-# app.add_route(list_docs, "/api/qanything/list_files", methods=['POST'])  # tags=["文件列表"]
-# app.add_route(get_total_status, "/api/qanything/get_total_status", methods=['POST'])  # tags=["获取所有知识库状态"]
-# app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # tags=["上传FAQ"]
-# app.add_route(get_qa_info, "/api/qanything/get_qa_info", methods=['POST'])  # tags=["获取QA信息"]
 
 
 def document(host, port):
@@ -25,7 +14,9 @@ def document(host, port):
     print("request url: ",url)
     try:
         response = requests.request("GET", url)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -42,7 +33,9 @@ def new_knowledge_base(host, port):
 
     try:
         response = requests.request("POST", url, headers=headers, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -58,7 +51,9 @@ def delete_knowledge_base(host, port):
 
     try:
         response = requests.request("POST", url, headers=headers, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -74,7 +69,9 @@ def list_kbs(host, port):
 
     try:
         response = requests.request("POST", url, headers=headers, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -85,14 +82,17 @@ def list_docs(host, port):
         "Content-Type": "application/json"
     }
 
-    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c9"}
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5"}
+    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c9"}
+    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4"}
+    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5"}
     
     print("prompt:", payload)
 
     try:
         response = requests.request("POST", url, headers=headers, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -108,7 +108,9 @@ def get_files_statu(host, port):
 
     try:
         response = requests.request("POST", url, headers=headers, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
 
     except Exception as e:
         print("Error:", e)
@@ -124,7 +126,9 @@ def document_parser(host, port):
 
     try:
         response = requests.request("POST", url, data=payload, files=files)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
 
     except Exception as e:
         print("Error:", e)
@@ -159,7 +163,9 @@ def document_parser_embedding(host, port):
     print("payload:",payload)
     try:
         response = requests.post(url, data=payload, files=files)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     
     except Exception as e:
         print("Error:", e)
@@ -235,7 +241,9 @@ Docker的总体架构是一个C/S模式的架构，用户通过Docker Client与D
     print("payload:",payload)
     try:
         response = requests.post(url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     
     except Exception as e:
         print("Error:", e)
@@ -248,13 +256,19 @@ def delete_docs(host, port):
 
     try:
         response = requests.request("POST", url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
 
 def question_rag_search(host, port):
     url = f"http://{host}:{port}/api/qanything/question_rag_search"
+    global question
+    if question=="":
+        question = input("请输入问题：")
+        print("问题：", question)
 
     # payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c5"], "question": "如何使用docker"}
     # payload = {'user_id': '6c087e71-3101-48e4-aa29-07ef1a38055b', 'kb_ids': ['KB568e4887f73643a8847227c474903cf3'], 'question': '办理离休干部入户'}
@@ -262,13 +276,15 @@ def question_rag_search(host, port):
     #     "Content-Type": "application/json",
     # }
 
-    payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c4"], #"KB6dae785cdd5d47a997e890521acbe1c5"], 
-               "question": "https://www.runoob.com/python3/python3-tutorial.html"}
+    payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c9"], 
+               "question": question}
     print("payload:",payload)
 
     try:
         response = requests.request("POST", url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
@@ -280,7 +296,9 @@ def get_total_status(host, port):
 
     try:
         response = requests.request("POST", url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
 
     except Exception as e:
         print("Error:", e)
@@ -297,7 +315,9 @@ def upload_faqs(host, port):
 
     try:
         response = requests.request("POST", url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
 
     except Exception as e:
         print("Error:", e)
@@ -311,7 +331,9 @@ def get_qa_info(host, port):
 
     try:
         response = requests.request("POST", url, json=payload)
-        print(response.text)
+        data=json.loads(response.text)
+        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        print(data_dumps)
 
     except Exception as e:
         print("Error:", e)
@@ -334,12 +356,18 @@ if __name__ == "__main__":
     usage()
     
     for arg in sys.argv[1:]:
-        if arg.startswith('--host='):
+        if arg=='--help' or arg=='-h':
+            usage()
+            sys.exit(0)
+        elif arg.startswith('--host='):
             host = arg.split('=')[1]
         elif arg.startswith('--port='):
             port = int(arg.split('=')[1])
         elif arg.startswith('--api='):
             api = arg.split('=')[1]
+        elif arg.startswith('--question='):
+            question = arg.split('=')[1]
+        
             
     print(f"host: {host}, port: {port}")
     print(f"api: {api}")
@@ -347,7 +375,6 @@ if __name__ == "__main__":
     if api in function_list:
         eval(api)(host, port)
     else:
-        # raise error
         print(f"api:{api} is not exsit.")
         
 

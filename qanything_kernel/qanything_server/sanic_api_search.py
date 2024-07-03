@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 import time
 
 # 获取当前脚本的绝对路径
@@ -17,65 +17,42 @@ root_dir = os.path.dirname(parent_dir)
 # 将项目根目录添加到sys.path
 sys.path.append(root_dir)
 
-import qanything_kernel.configs.model_config as model_config
-from qanything_kernel.utils.custom_log import debug_logger
-from qanything_kernel.utils.general_utils import download_file, get_gpu_memory_utilization, check_package_version
-import torch
-import platform
+
+
+# 读取输入参数
 from argparse import ArgumentParser
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-os_system = platform.system()
 parser = ArgumentParser()
-
-from sanic import Sanic
-from sanic import response as sanic_response
-from sanic.worker.manager import WorkerManager
-import signal
-import requests
-from modelscope import snapshot_download
-from modelscope.hub.file_download import model_file_download
-import subprocess
-
 parser.add_argument('--host', dest='host', default='0.0.0.0', help='set host for qanything server')
 parser.add_argument('--port', dest='port', default=8777, type=int, help='set port for qanything server')
 parser.add_argument('--workers', dest='workers', default=4, type=int, help='sanic server workers number')
 parser.add_argument('--device', dest='device', default='npu', help='显卡设备，可以设置为npu, gpu, cpu')
 parser.add_argument('--device_id', dest='device_id', default='0', help='cuda device id for qanything server')
+parser.add_argument('--offline', dest='offline', default=False, help='offline mode')
 args = parser.parse_args()
 
+# 针对离线推理环境，需要设置tiktoken以及unstructured库部分组件联网检查的问题
+if args.offline:
+    # 设置tiktoken联网检查为False
+    tiktoken_cache_dir = "/workspace/qanything_kernel/model/tiktoken_model"
+    os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
+    
+    # 设置unstructured联网检查为False
+    os.environ["SCARF_NO_ANALYTICS"] = True
+    os.environ["DO_NOT_TRACK"] = True
 
-# if os_system != 'Darwin':
-#     glibc_info = platform.libc_ver()
-#     if glibc_info[0] != 'glibc':
-#         raise ValueError(f"Unsupported libc: {glibc_info[0]}, 请确认系统是否为Linux系统。")
-#     glibc_version = float(glibc_info[1])
-#     if glibc_version < 2.28:
-#         if not check_package_version("onnxruntime", "1.16.3"):
-#             print(f"当前系统glibc版本为{glibc_version}<2.28，无法使用onnxruntime-gpu(cuda12.x)，将安装onnxruntime来代替", flush=True)
-#             os.system("pip install onnxruntime")
-#     else:
-#         # 官方发布的1.17.1不支持cuda12以上的系统，需要根据官方文档:https://onnxruntime.ai/docs/install/里提到的地址手动下载whl
-#         if not check_package_version("onnxruntime-gpu", "1.17.1"):
-#             download_url = f"https://aiinfra.pkgs.visualstudio.com/PublicPackages/_apis/packaging/feeds/9387c3aa-d9ad-4513-968c-383f6f7f53b8/pypi/packages/onnxruntime-gpu/versions/1.17.1/onnxruntime_gpu-1.17.1-cp3{python3_version}-cp3{python3_version}-{system_name}.whl/content"
-#             debug_logger.info(f'开始从{download_url}下载onnxruntime，也可以手动下载并通过pip install *.whl安装')
-#             whl_name = f'onnxruntime_gpu-1.17.1-cp3{python3_version}-cp3{python3_version}-{system_name}.whl'
-#             download_file(download_url, whl_name)
-#             exit_status = os.system(f"pip install {whl_name}")
-#             if exit_status != 0:
-#                 # raise ValueError(f"安装onnxruntime失败，请手动安装{whl_name}")
-#                 debug_logger.warning(f"安装onnxruntime-gpu失败，将安装onnxruntime来代替")
-#                 print(f"安装onnxruntime-gpu失败，将安装onnxruntime来代替", flush=True)
-#                 os.system("pip install onnxruntime")
+# 控制分词器（Tokenizers）在处理文本时的并行性
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
     
 
 
-
-
-
+from sanic import Sanic
+from sanic import response as sanic_response
+from sanic.worker.manager import WorkerManager
 from .handler_search import *
 from qanything_kernel.core.local_doc_search import LocalDocSearch
+from qanything_kernel.utils.custom_log import debug_logger
 
 WorkerManager.THRESHOLD = 6000
 
@@ -121,26 +98,6 @@ async def init_local_doc_qa(app, loop):
 async def print_info(app, loop):
     print("已启动后端服务。", flush=True)
 
-# app.add_route(document, "/api/docs", methods=['GET'])
-# app.add_route(new_knowledge_base, "/api/local_doc_qa/new_knowledge_base", methods=['POST'])  # tags=["新建知识库"]
-# app.add_route(upload_weblink, "/api/local_doc_qa/upload_weblink", methods=['POST'])  # tags=["上传网页链接"]
-# app.add_route(upload_files, "/api/local_doc_qa/upload_files", methods=['POST'])  # tags=["上传文件"]
-# app.add_route(local_doc_chat, "/api/local_doc_qa/local_doc_chat", methods=['POST'])  # tags=["问答接口"] 
-# app.add_route(list_kbs, "/api/local_doc_qa/list_knowledge_base", methods=['POST'])  # tags=["知识库列表"] 
-# app.add_route(list_docs, "/api/local_doc_qa/list_files", methods=['POST'])  # tags=["文件列表"]
-# app.add_route(get_total_status, "/api/local_doc_qa/get_total_status", methods=['POST'])  # tags=["获取所有知识库状态"]
-# app.add_route(clean_files_by_status, "/api/local_doc_qa/clean_files_by_status", methods=['POST'])  # tags=["清理数据库"]
-# app.add_route(delete_docs, "/api/local_doc_qa/delete_files", methods=['POST'])  # tags=["删除文件"]
-# app.add_route(delete_knowledge_base, "/api/local_doc_qa/delete_knowledge_base", methods=['POST'])  # tags=["删除知识库"] 
-# app.add_route(rename_knowledge_base, "/api/local_doc_qa/rename_knowledge_base", methods=['POST'])  # tags=["重命名知识库"]
-# app.add_route(new_bot, "/api/local_doc_qa/new_bot", methods=['POST'])  # tags=["新建Bot"]
-# app.add_route(delete_bot, "/api/local_doc_qa/delete_bot", methods=['POST'])  # tags=["删除Bot"]
-# app.add_route(update_bot, "/api/local_doc_qa/update_bot", methods=['POST'])  # tags=["更新Bot"]
-# app.add_route(get_bot_info, "/api/local_doc_qa/get_bot_info", methods=['POST'])  # tags=["获取Bot信息"]
-# app.add_route(upload_faqs, "/api/local_doc_qa/upload_faqs", methods=['POST'])  # tags=["上传FAQ"]
-# app.add_route(get_file_base64, "/api/local_doc_qa/get_file_base64", methods=['POST'])  # tags=["获取文件base64"]
-# app.add_route(get_qa_info, "/api/local_doc_qa/get_qa_info", methods=['POST'])  # tags=["获取QA信息"]
-
 
 
 app.add_route(document, "/api/docs", methods=['GET'])   # tags=["接口文档"]
@@ -155,10 +112,6 @@ app.add_route(list_docs, "/api/qanything/list_files", methods=['POST'])  # tags=
 app.add_route(get_files_statu, "/api/qanything/get_files_statu", methods=['POST'])  # tags=["获取指定文件状态"]
 app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # tags=["上传FAQ"]
 
-
-# app.add_route(get_total_status, "/api/qanything/get_total_status", methods=['POST'])  # tags=["获取所有知识库状态"]
-# app.add_route(delete_docs, "/api/qanything/delete_files", methods=['POST'])  # tags=["删除文件"]
-# app.add_route(get_qa_info, "/api/qanything/get_qa_info", methods=['POST'])  # tags=["获取QA信息"]
 
 
 if __name__ == "__main__":
