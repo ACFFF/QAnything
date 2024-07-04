@@ -245,7 +245,7 @@ class LocalFile:
             # 不是csv，xlsx和FAQ的文件，需要再次分割
             if not self.file_path.lower().endswith(".csv") and not self.file_path.lower().endswith(".xlsx") and not self.file_path == 'FAQ':
                 new_docs = []
-                min_length = 200
+                min_length = 600
                 for doc in docs:
                     if not new_docs:
                         new_docs.append(doc)

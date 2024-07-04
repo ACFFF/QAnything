@@ -110,10 +110,24 @@ class LocalDocSearch:
                 unique_docs.add(doc.page_content)
                 deduplicated_docs.append(doc)
         return deduplicated_docs
+    
+    def add_filename_to_docs(self, source_docs):
+        for doc in source_docs:
+            doc.page_content = f"{doc.metadata['file_name']}\n{doc.page_content}"
+        return source_docs
+
+    def del_filename_in_docs(self, source_docs):
+        for doc in source_docs:
+            doc.page_content = doc.page_content.replace(f"{doc.metadata['file_name']}\n", "")
+        return source_docs
 
     async def local_doc_search(self, query, kb_ids, score_threshold=0.35):
         source_documents = await self.get_source_documents(query, kb_ids)
         deduplicated_docs = self.deduplicate_documents(source_documents)
+        
+        # debug_logger.info("add filename to docs")
+        # deduplicated_docs = self.add_filename_to_docs(deduplicated_docs)    # add file name
+        
         retrieval_documents = sorted(deduplicated_docs, key=lambda x: x.metadata['score'], reverse=True)
         if len(retrieval_documents) > 1:
             debug_logger.info(f"use rerank, rerank docs num: {len(retrieval_documents)}")
@@ -127,7 +141,25 @@ class LocalDocSearch:
         
         retrieval_documents = retrieval_documents[: self.rerank_top_k]
         debug_logger.info(f"local doc search retrieval_documents: {retrieval_documents}")
-        return retrieval_documents
+        # return retrieval_documents
+        
+        # debug_logger.info("del filename in docs")
+        # retrieval_documents = self.del_filename_in_docs(retrieval_documents)
+        # 对候选的文档，按照文档名再次进行rerank，按照score从高到低排序，将名称更相关的放在前面
+        debug_logger.info(f"use filename rerank...")
+        retrieval_documents_filename = []
+        for item in retrieval_documents:
+            item.mentadata["page_content"] = item.page_content
+            item.page_content=item.metadata['file_name']
+            retrieval_documents_filename.append(item)
+        rerank_retrieval_documents_filename = self.rerank_documents(query, retrieval_documents_filename)
+        for item in rerank_retrieval_documents_filename:
+            item.page_content=item.metadata['page_content']
+            del item.metadata['page_content']
+        debug_logger.info(f"rerank_retrieval_documents_filename: {rerank_retrieval_documents_filename}")
+        return rerank_retrieval_documents_filename
+        
+        
 
     def get_web_search(self, queries, top_k=None):
         if not top_k:
@@ -239,9 +271,9 @@ class LocalDocSearch:
         retrieval_documents = await self.local_doc_search(query, kb_ids)
         if need_web_search:
             retrieval_documents.extend(self.web_page_search(query, top_k=3))
-        debug_logger.info(f"retrieval_documents: {retrieval_documents}")
-        retrieval_documents = self.rerank_documents(query, retrieval_documents)
-        debug_logger.info(f"reranked retrieval_documents: {retrieval_documents}")
+            debug_logger.info(f"add web_search retrieval_documents: {retrieval_documents}")
+            retrieval_documents = self.rerank_documents(query, retrieval_documents)
+            debug_logger.info(f"add web_search reranked retrieval_documents: {retrieval_documents}")
         return retrieval_documents
 
     async def get_knowledge_based_answer(self, query, kb_ids, 
