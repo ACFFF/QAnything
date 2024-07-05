@@ -108,6 +108,7 @@ class LocalDocSearch:
         for doc in source_docs:
             if doc.page_content not in unique_docs:
                 unique_docs.add(doc.page_content)
+                doc.metadata['faiss_search_score'] = float(doc.metadata['score'])  #add faiss search score
                 deduplicated_docs.append(doc)
         return deduplicated_docs
     
@@ -121,6 +122,21 @@ class LocalDocSearch:
             doc.page_content = doc.page_content.replace(f"{doc.metadata['file_name']}\n", "")
         return source_docs
 
+    
+    def expand_page_by_context(self, doc, context_length=600, positions=[-1,1]):
+        for position in positions:
+            position_doc = self.faiss_client.get_neighbors_documents(doc, position)
+            if position_doc and position<0:
+                doc.page_content = position_doc.page_content+doc.page_content
+            elif position_doc and position>0:
+                doc.page_content = doc.page_content+position_doc.page_content            
+        
+        if len(doc.page_content) >= context_length:
+            return doc
+        else:
+            return self.expand_page_by_context(doc, context_length=context_length, positions=[positions[0]-1, positions[1]+1])
+    
+    
     async def local_doc_search(self, query, kb_ids, score_threshold=0.35):
         source_documents = await self.get_source_documents(query, kb_ids)
         deduplicated_docs = self.deduplicate_documents(source_documents)
@@ -142,22 +158,32 @@ class LocalDocSearch:
         retrieval_documents = retrieval_documents[: self.rerank_top_k]
         debug_logger.info(f"local doc search retrieval_documents: {retrieval_documents}")
         # return retrieval_documents
+
+        # 获取相邻的该文档的信息
+        for item in retrieval_documents:
+            if len(item.page_content) < 600:
+                debug_logger.info(f"before expand page by context: {len(item.page_content)}")
+                item = self.expand_page_by_context(item, context_length=600)
+                debug_logger.info(f"after expand page by context: {len(item.page_content)}")
+        return retrieval_documents
         
         # debug_logger.info("del filename in docs")
         # retrieval_documents = self.del_filename_in_docs(retrieval_documents)
+        
         # 对候选的文档，按照文档名再次进行rerank，按照score从高到低排序，将名称更相关的放在前面
-        debug_logger.info(f"use filename rerank...")
-        retrieval_documents_filename = []
-        for item in retrieval_documents:
-            item.mentadata["page_content"] = item.page_content
-            item.page_content=item.metadata['file_name']
-            retrieval_documents_filename.append(item)
-        rerank_retrieval_documents_filename = self.rerank_documents(query, retrieval_documents_filename)
-        for item in rerank_retrieval_documents_filename:
-            item.page_content=item.metadata['page_content']
-            del item.metadata['page_content']
-        debug_logger.info(f"rerank_retrieval_documents_filename: {rerank_retrieval_documents_filename}")
-        return rerank_retrieval_documents_filename
+        # debug_logger.info(f"use filename rerank...")
+        # retrieval_documents_filename = []
+        # for item in retrieval_documents:
+        #     item.metadata["page_rerank_socre"] = item.metadata["score"] #保存原始的score
+        #     item.metadata["page_content"] = item.page_content
+        #     item.page_content=item.metadata['file_name']
+        #     retrieval_documents_filename.append(item)
+        # rerank_retrieval_documents_filename = self.rerank_documents(query, retrieval_documents_filename)
+        # for item in rerank_retrieval_documents_filename:
+        #     item.page_content=item.metadata['page_content']
+        #     del item.metadata['page_content']
+        # debug_logger.info(f"rerank_retrieval_documents_filename: {rerank_retrieval_documents_filename}")
+        # return rerank_retrieval_documents_filename
         
         
 

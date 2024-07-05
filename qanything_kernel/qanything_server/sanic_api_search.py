@@ -37,8 +37,8 @@ if args.offline:
     os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
     
     # 设置unstructured联网检查为False
-    os.environ["SCARF_NO_ANALYTICS"] = True
-    os.environ["DO_NOT_TRACK"] = True
+    os.environ["SCARF_NO_ANALYTICS"] = str(True)
+    os.environ["DO_NOT_TRACK"] = str(True)
 
 # 控制分词器（Tokenizers）在处理文本时的并行性
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

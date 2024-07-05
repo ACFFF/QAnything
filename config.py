@@ -44,7 +44,7 @@ text_splitter_config = {
     # 切割文件chunk块的大小
     "chunk_size": 400,
     # 切割文件的相邻文本重合长度
-    "chunk_overlap": 100
+    "chunk_overlap": 0
 }
 pdf_splitter_config = {
     # 切割文件chunk块的大小

@@ -77,14 +77,14 @@ class LocalFile:
                 self.mode = "list"
                 self.file_list = file
                 upload_path = os.path.join(UPLOAD_ROOT_PATH, user_id)
-                file_dir = os.path.join(upload_path, self.file_id)
+                file_dir = os.path.join(upload_path, self.kb_id, self.file_id)
                 os.makedirs(file_dir, exist_ok=True)
                 self.file_path = os.path.join(file_dir, self.file_name)
                 self.file_content = "\n\n\n\n".join(file).encode('utf-8')
                 debug_logger.info(f'success init load list chunk file {self.file_name}')
             else:
                 upload_path = os.path.join(UPLOAD_ROOT_PATH, user_id)
-                file_dir = os.path.join(upload_path, self.file_id)
+                file_dir = os.path.join(upload_path, self.kb_id, self.file_id)
                 os.makedirs(file_dir, exist_ok=True)
                 self.file_path = os.path.join(file_dir, self.file_name)
                 self.file_content = file.body
@@ -194,6 +194,7 @@ class LocalFile:
                     loader = UnstructuredPaddlePDFLoader(self.file_path, ocr_engine, self.use_cpu)
                     texts_splitter = ChineseTextSplitter(pdf=True, sentence_size=sentence_size)
                     docs = loader.load_and_split(texts_splitter)
+                    # print("docs:", docs)
                 else:
                     try:
                         from qanything_kernel.utils.loader.self_pdf_loader import PdfLoader
@@ -245,7 +246,7 @@ class LocalFile:
             # 不是csv，xlsx和FAQ的文件，需要再次分割
             if not self.file_path.lower().endswith(".csv") and not self.file_path.lower().endswith(".xlsx") and not self.file_path == 'FAQ':
                 new_docs = []
-                min_length = 600
+                min_length = 100
                 for doc in docs:
                     if not new_docs:
                         new_docs.append(doc)

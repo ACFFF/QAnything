@@ -244,6 +244,11 @@ class KnowledgeBaseManager:
         placeholders = ','.join(['?'] * len(file_ids))
         query = "SELECT docstore_id FROM Document WHERE file_id IN ({})".format(placeholders)
         return self.execute_query_(query, file_ids, fetch=True)
+    
+    def get_documents_by_fileid_chunkid(self, file_ids, chunk_id):
+        # 使用参数化查询        
+        query = "SELECT docstore_id, chunk_id, file_id, file_name, kb_id FROM Document WHERE file_id = ? AND chunk_id = ?"
+        return self.execute_query_(query, (file_ids, chunk_id), fetch=True)
 
     def new_knowledge_base(self, kb_id, user_id, kb_name, user_name=None):
         if not self.check_user_exist_(user_id):
@@ -283,15 +288,28 @@ class KnowledgeBaseManager:
     def delete_knowledge_base(self, user_id, kb_ids):
         # 使用参数化查询
         try:
+            # placeholders = ','.join(['?'] * len(kb_ids))
+            # query = "UPDATE KnowledgeBase SET deleted = 1 WHERE user_id = ? AND kb_id IN ({})".format(placeholders)
+            # query_params = [user_id] + kb_ids
+            # self.execute_query_(query, query_params, commit=True)
+
+            # # 更新文件的删除状态也需要使用参数化查询
+            # query = "UPDATE File SET deleted = 1 WHERE kb_id IN ({}) AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?)".format(placeholders)
+            # debug_logger.info("delete_knowledge_base: {}".format(kb_ids))
+            # self.execute_query_(query, query_params, commit=True)
+
+            
             placeholders = ','.join(['?'] * len(kb_ids))
-            query = "UPDATE KnowledgeBase SET deleted = 1 WHERE user_id = ? AND kb_id IN ({})".format(placeholders)
+            query = "DELETE FROM KnowledgeBase WHERE user_id = ? AND kb_id IN ({})".format(placeholders)
             query_params = [user_id] + kb_ids
             self.execute_query_(query, query_params, commit=True)
-
-            # 更新文件的删除状态也需要使用参数化查询
-            query = "UPDATE File SET deleted = 1 WHERE kb_id IN ({}) AND kb_id IN (SELECT kb_id FROM KnowledgeBase WHERE user_id = ?)".format(placeholders)
+            
+            query = "DELETE FROM File WHERE kb_id IN ({})".format(placeholders)
             debug_logger.info("delete_knowledge_base: {}".format(kb_ids))
-            self.execute_query_(query, query_params, commit=True)
+            query_params2 = kb_ids
+            self.execute_query_(query, query_params2, commit=True)
+
+                        
         except Exception as e:
             debug_logger.error("delete_knowledge_base: {}".format(e))
 

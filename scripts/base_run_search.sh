@@ -47,6 +47,11 @@ if [ -z "$qanything_port" ]; then
     exit 1
 fi
 
+echo "device: $device"
+echo "device_id: $device_id"
+echo "qanything_port: $qanything_port"
+echo "workers: $workers"
+
 
 
 echo -e "即将启动后端服务"

@@ -102,8 +102,8 @@ FAISS_CACHE_SIZE = 10
 # LOCAL_LLM_MODEL_NAME = llm_api_serve_model
 # LOCAL_LLM_MAX_LENGTH = 4096
 
-LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'bce-reranker-base_v1')
-# LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'rerank_model_configs_v0.0.1')
+# LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'bce-reranker-base_v1')
+LOCAL_RERANK_PATH = os.path.join(root_path, 'model', 'rerank_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_RERANK_REPO = "maidalun/bce-reranker-base_v1"
     LOCAL_RERANK_MODEL_PATH = os.path.join(LOCAL_RERANK_PATH, "pytorch_model.bin")
@@ -114,8 +114,8 @@ print('LOCAL_RERANK_REPO:', LOCAL_RERANK_REPO)
 LOCAL_RERANK_MODEL_NAME = 'rerank'
 LOCAL_RERANK_MAX_LENGTH = 512
 
-LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'bce-embedding-base_v1')
-# LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'embedding_model_configs_v0.0.1')
+# LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'bce-embedding-base_v1')
+LOCAL_EMBED_PATH = os.path.join(root_path, 'model', 'embedding_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_EMBED_REPO = "maidalun/bce-embedding-base_v1"
     LOCAL_EMBED_MODEL_PATH = os.path.join(LOCAL_EMBED_PATH, "pytorch_model.bin")

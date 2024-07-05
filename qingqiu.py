@@ -28,7 +28,7 @@ def new_knowledge_base(host, port):
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4", "kb_name": "rag2"}
+    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1", "kb_name": "区公安分局“答”板块"}
     print("prompt:", payload)
 
     try:
@@ -46,7 +46,7 @@ def delete_knowledge_base(host, port):
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4"} #, "file_ids": "123"}
+    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1", "file_ids": ["d1315e2e9bc64c67b8202466ce1ae75b"]}
     print("prompt:", payload)
 
     try:
@@ -82,7 +82,7 @@ def list_docs(host, port):
         "Content-Type": "application/json"
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c9"}
+    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c2"}
     # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4"}
     # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5"}
     
@@ -142,10 +142,12 @@ def document_parser_embedding(host, port):
     # files=[('files',open('./docx_data/12345日报/2024258236895.pdf','rb'))]
     # files=[('files', open('./docx_data/12345日报/2024149362154.pdf','rb'))]
 
-    folder_path = "./docx_data/12345日报/"  # 文件所在文件夹，注意是文件夹！！
+    # folder_path = "./docx_data/12345日报/"  # 文件所在文件夹，注意是文件夹！！
+    folder_path = "/media/darren/F5E7B706BE167807/xinjin_data/区公安分局“答”板块/"
+    # folder_path = "/media/darren/F5E7B706BE167807/xinjin_data/不动产"
     payload = {
         "user_id": "zzp",
-        "kb_id": "KB6dae785cdd5d47a997e890521acbe1c9",
+        "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1",
         "mode": "soft"
     }
 
@@ -276,7 +278,7 @@ def question_rag_search(host, port):
     #     "Content-Type": "application/json",
     # }
 
-    payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c9"], 
+    payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c1", "KB6dae785cdd5d47a997e890521acbe1c2"], 
                "question": question}
     print("payload:",payload)
 
@@ -353,7 +355,6 @@ if __name__ == "__main__":
     host = "0.0.0.0"
     port = 8777
     api = ""
-    usage()
     
     for arg in sys.argv[1:]:
         if arg=='--help' or arg=='-h':

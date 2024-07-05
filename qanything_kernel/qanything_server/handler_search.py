@@ -3,6 +3,7 @@ from qanything_kernel.core.local_doc_search import LocalDocSearch
 from qanything_kernel.utils.general_utils import *
 from qanything_kernel.utils.custom_log import debug_logger, qa_logger
 from qanything_kernel.configs.model_config import BOT_DESC, BOT_IMAGE, BOT_PROMPT, BOT_WELCOME
+from qanything_kernel.configs.model_config import UPLOAD_ROOT_PATH
 from qanything_kernel.qanything_server.save_apicsv import save_api_call_to_csv
 from sanic.response import ResponseStream
 from sanic.response import json as sanic_json
@@ -164,10 +165,22 @@ async def delete_knowledge_base(req: request):
         local_doc_qa.faiss_client.delete_documents(kb_id=kb_id, file_ids=file_ids)
         # 删除数据库中的记录
         local_doc_qa.mysql_client.delete_files(kb_id, file_ids)
+        
+        # 删除文件
+        for file_id in file_ids:
+            file_path = os.path.join(UPLOAD_ROOT_PATH, user_id, kb_id, file_id)
+            if os.path.exists(file_path):
+                os.remove(file_path)
         return sanic_json({"code": 200, "msg": "documents {} delete success".format(file_ids)})
     else:    
         local_doc_qa.faiss_client.delete_documents(kb_id=kb_id)
         local_doc_qa.mysql_client.delete_knowledge_base(user_id, [kb_id])
+
+        # 新增删除content文件
+        knowledge_content_path = os.path.join(UPLOAD_ROOT_PATH,user_id, kb_id)
+        if os.path.exists(knowledge_content_path):
+            os.rmdir(knowledge_content_path)
+        
         return sanic_json({"code": 200, "msg": "Knowledge Base {} delete success".format(kb_id)})
 
 

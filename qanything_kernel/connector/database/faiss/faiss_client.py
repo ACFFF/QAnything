@@ -154,3 +154,22 @@ class FaissClient:
             os.chmod(os.path.dirname(faiss_index_path), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
         except ValueError as e:
             debug_logger.warning(f'delete documents not find docs')
+   
+
+    
+    def get_neighbors_documents(self, doc, position=0):
+        debug_logger.info(f'get neighbors documents: {doc.metadata}')        
+        if self.faiss_client is None or self.kb_ids != [doc.metadata['kb_id']]:
+            self._load_kb_to_memory([doc.metadata['kb_id']])
+            
+        # 根据doc的file_id, 在mysql_client中查看文件的信息
+        position_doc_info = self.mysql_client.get_documents_by_fileid_chunkid(doc.metadata['file_id'], doc.metadata['chunk_id']+position)
+        position_doc = None
+        if position_doc_info:
+            position_doc_docstore_id = position_doc_info[0][0]
+            position_doc = self.faiss_client.docstore.search(position_doc_docstore_id)
+        debug_logger.info(f"position_doc_info: {position_doc_info}")
+        # debug_logger.info(f"position_doc:{position_doc}")
+
+        return position_doc
+        
