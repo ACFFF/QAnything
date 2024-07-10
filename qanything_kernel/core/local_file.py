@@ -1,6 +1,6 @@
 from qanything_kernel.utils.general_utils import *
 from typing import List, Union, Callable
-from qanything_kernel.configs.model_config import UPLOAD_ROOT_PATH, SENTENCE_SIZE, ZH_TITLE_ENHANCE, USE_FAST_PDF_PARSER, PDF_MODEL_PATH
+from qanything_kernel.configs.model_config import UPLOAD_ROOT_PATH, SENTENCE_SIZE, ZH_TITLE_ENHANCE, USE_FAST_PDF_PARSER, PDF_MODEL_PATH, ADD_FILENAME_TO_EMBEDDING
 from langchain.docstore.document import Document
 from qanything_kernel.utils.loader.my_recursive_url_loader import MyRecursiveUrlLoader
 from langchain_community.document_loaders import UnstructuredFileLoader, TextLoader
@@ -246,7 +246,7 @@ class LocalFile:
             # 不是csv，xlsx和FAQ的文件，需要再次分割
             if not self.file_path.lower().endswith(".csv") and not self.file_path.lower().endswith(".xlsx") and not self.file_path == 'FAQ':
                 new_docs = []
-                min_length = 100
+                min_length = 600
                 for doc in docs:
                     if not new_docs:
                         new_docs.append(doc)
@@ -281,7 +281,14 @@ class LocalFile:
                     new_doc.metadata['faq_dict'] = {}
                 else:
                     new_doc.metadata['faq_dict'] = doc.metadata['faq_dict']
+                
+                
+                if ADD_FILENAME_TO_EMBEDDING:
+                    file_name = "<<"+os.path.splitext(new_doc.metadata["file_name"])[0]+">>:\n"
+                    new_doc.page_content = file_name + new_doc.page_content
                 new_docs.append(new_doc)
+
+                
 
             if new_docs:
                 debug_logger.info('langchain analysis content head: %s', new_docs[0].page_content[:100])

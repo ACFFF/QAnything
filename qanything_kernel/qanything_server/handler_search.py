@@ -20,6 +20,7 @@ from tqdm import tqdm
 import os
 import time
 import base64
+import shutil
 
 __all__ = ["document", "new_knowledge_base", "document_parser", "document_parser_embedding", "delete_knowledge_base", "question_rag_search",
            "list_kbs", "list_docs", "delete_docs", "get_total_status", "get_files_statu", "upload_faqs", "get_qa_info", "chunk_embedding"]
@@ -170,7 +171,7 @@ async def delete_knowledge_base(req: request):
         for file_id in file_ids:
             file_path = os.path.join(UPLOAD_ROOT_PATH, user_id, kb_id, file_id)
             if os.path.exists(file_path):
-                os.remove(file_path)
+                shutil.rmtree(file_path)
         return sanic_json({"code": 200, "msg": "documents {} delete success".format(file_ids)})
     else:    
         local_doc_qa.faiss_client.delete_documents(kb_id=kb_id)
@@ -179,7 +180,7 @@ async def delete_knowledge_base(req: request):
         # 新增删除content文件
         knowledge_content_path = os.path.join(UPLOAD_ROOT_PATH,user_id, kb_id)
         if os.path.exists(knowledge_content_path):
-            os.rmdir(knowledge_content_path)
+            shutil.rmtree(knowledge_content_path)
         
         return sanic_json({"code": 200, "msg": "Knowledge Base {} delete success".format(kb_id)})
 
@@ -428,8 +429,7 @@ async def question_rag_search(req: request):
                                kb_ids), "source_documents": [{}]})
     else:
         retrieval_documents = await local_doc_qa.get_knowledge_based_answer(query=question, 
-                                                                        kb_ids=kb_ids, 
-                                                                        streaming=False, 
+                                                                        kb_ids=kb_ids,
                                                                         rerank=rerank)
 
         
@@ -449,7 +449,7 @@ async def question_rag_search(req: request):
         try:
             t2 = time.time()    
             date = datetime.now().strftime("%Y-%m-%d")
-            save_api_call_to_csv(date, "question_rag_search", req.form, return_result, t2-t1)
+            save_api_call_to_csv(date, "question_rag_search", req.json, return_result, t2-t1)
             debug_logger.info(f"question_rag_search time cost:{t2-t1}")
         except Exception as e:
             debug_logger.warn(f"save api 失败，异常信息：{e}")

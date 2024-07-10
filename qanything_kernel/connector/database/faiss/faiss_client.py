@@ -1,7 +1,7 @@
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore import InMemoryDocstore
 from langchain_core.documents import Document
-from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, FAISS_LOCATION, FAISS_CACHE_SIZE
+from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, FAISS_LOCATION, FAISS_CACHE_SIZE, ADD_FILENAME_TO_EMBEDDING
 from typing import Optional, Union, Callable, Dict, Any, List, Tuple
 from langchain_community.vectorstores.faiss import dependable_faiss_import
 from qanything_kernel.utils.custom_log import debug_logger
@@ -91,23 +91,44 @@ class FaissClient:
 
     def merge_docs(self, docs):
         # 把docs按照file_id进行合并，但是需要对所有file_id相同的doc根据chunk_id先排序，chunk_id相邻的doc合并
+        # 合并如果添加了标题，需要进行删除
         merged_docs = []
         docs = sorted(docs, key=lambda x: (x.metadata['file_id'], x.metadata['chunk_id']))
         for doc in docs:
             if not merged_docs or merged_docs[-1].metadata['file_id'] != doc.metadata['file_id']:
                 merged_docs.append(doc)
+                file_name = "<<"+os.path.splitext(merged_docs[-1].metadata["file_name"])[0]+">>:\n"
+                if ADD_FILENAME_TO_EMBEDDING and file_name not in merged_docs[-1].page_content:
+                    merged_docs[-1].page_content = file_name + merged_docs[-1].page_content
+                    debug_logger.warn(f"Manual add file name in doc page content!{doc.page_content[:50]}{doc.metadata}")
             else:
                 if merged_docs[-1].metadata['chunk_id'] == doc.metadata['chunk_id'] - 1:
                     if num_tokens(merged_docs[-1].page_content + doc.page_content) <= 800:
-                        # print('MERGE:', merged_docs[-1].metadata['chunk_id'], doc.metadata['chunk_id'])
+                        if ADD_FILENAME_TO_EMBEDDING:
+                            file_name_tmp = doc.metadata['file_name']
+                            file_name_tmp = "<<"+os.path.splitext(file_name_tmp)[0]+">>:\n"
+                            if not doc.page_content.startswith(file_name_tmp):
+                                debug_logger.error(f'doc not start with file name: {doc.page_content[:50]}{doc.metadata}')
+                            doc.page_content = doc.page_content.replace(file_name_tmp, '')
                         merged_docs[-1].page_content += '\n' + doc.page_content
-                        merged_docs[-1].metadata['chunk_id'] = doc.metadata['chunk_id']
+                        merged_docs[-1].metadata['chunk_id'] = doc.metadata['chunk_id'] #注意，chunk_id以后面的为准，则merged后扩充只能往后扩充，往前则会重复
+                        
                     else:
                         # print('NOT MERGE:', merged_docs[-1].metadata['chunk_id'], doc.metadata['chunk_id'])
                         merged_docs.append(doc)
+                        file_name = "<<"+os.path.splitext(merged_docs[-1].metadata["file_name"])[0]+">>:\n"
+                        if ADD_FILENAME_TO_EMBEDDING and file_name not in merged_docs[-1].page_content:
+                            merged_docs[-1].page_content = file_name + merged_docs[-1].page_content
+                            debug_logger.warn(f"Manual add file name in doc page content!{doc.page_content[:50]}{doc.metadata}")
                 else:
                     # print('NOT MERGE:', merged_docs[-1].metadata['chunk_id'], doc.metadata['chunk_id'])
                     merged_docs.append(doc)
+                    file_name = "<<"+os.path.splitext(merged_docs[-1].metadata["file_name"])[0]+">>:\n"
+                    if ADD_FILENAME_TO_EMBEDDING and file_name not in merged_docs[-1].page_content:
+                        merged_docs[-1].page_content = file_name + merged_docs[-1].page_content
+                        debug_logger.warn(f"Manual add file name in doc page content!{doc.page_content[:50]}{doc.metadata}")
+            
+
         return merged_docs
 
     async def add_document(self, docs):
@@ -158,7 +179,7 @@ class FaissClient:
 
     
     def get_neighbors_documents(self, doc, position=0):
-        debug_logger.info(f'get neighbors documents: {doc.metadata}')        
+        # debug_logger.info(f'get neighbors documents: {doc.metadata}')        
         if self.faiss_client is None or self.kb_ids != [doc.metadata['kb_id']]:
             self._load_kb_to_memory([doc.metadata['kb_id']])
             
@@ -168,7 +189,7 @@ class FaissClient:
         if position_doc_info:
             position_doc_docstore_id = position_doc_info[0][0]
             position_doc = self.faiss_client.docstore.search(position_doc_docstore_id)
-        debug_logger.info(f"position_doc_info: {position_doc_info}")
+        # debug_logger.info(f"position_doc_info: {position_doc_info}")
         # debug_logger.info(f"position_doc:{position_doc}")
 
         return position_doc

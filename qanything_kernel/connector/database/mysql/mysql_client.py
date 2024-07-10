@@ -162,8 +162,8 @@ class KnowledgeBaseManager:
     def check_kb_exist(self, user_id, kb_ids):
         # 使用参数化查询
         placeholders = ','.join(['?'] * len(kb_ids))
-        query = "SELECT kb_id FROM KnowledgeBase WHERE kb_id IN ({}) AND deleted = 0 AND user_id = ?".format(
-            placeholders)
+        # query = "SELECT kb_id FROM KnowledgeBase WHERE kb_id IN ({}) AND deleted = 0 AND user_id = ?".format(placeholders)
+        query = "SELECT kb_id FROM KnowledgeBase WHERE kb_id IN ({}) AND user_id = ?".format(placeholders)
         query_params = kb_ids + [user_id]
         result = self.execute_query_(query, query_params, fetch=True)
         debug_logger.info("check_kb_exist {}".format(result))
@@ -503,7 +503,8 @@ class KnowledgeBaseManager:
     # [文件] 删除指定文件
     def delete_files(self, kb_id, file_ids):
         file_ids_str = ','.join("'{}'".format(str(x)) for x in file_ids)
-        query = "UPDATE File SET deleted = 1 WHERE kb_id = ? AND file_id IN ({})".format(file_ids_str)
+        # query = "UPDATE File SET deleted = 1 WHERE kb_id = ? AND file_id IN ({})".format(file_ids_str)
+        query = "DELETE FROM File WHERE kb_id = ? AND file_id IN ({})".format(file_ids_str)
         debug_logger.info("delete_files: {}".format(file_ids))
         self.execute_query_(query, (kb_id,), commit=True)
 

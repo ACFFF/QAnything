@@ -1,6 +1,7 @@
 from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, CHUNK_SIZE, VECTOR_SEARCH_SCORE_THRESHOLD, \
-    PROMPT_TEMPLATE, STREAMING, OCR_MODEL_PATH
+    OCR_MODEL_PATH, SEARCH_EXPAND_CONTENT, SEARCH_EXPAND_CONTENT_LENGTH, ADD_FILENAME_TO_EMBEDDING
 from typing import List
+import os
 import time
 from langchain.schema import Document
 from qanything_kernel.connector.database.mysql.mysql_client import KnowledgeBaseManager
@@ -17,6 +18,7 @@ import base64
 import numpy as np
 import platform
 import cv2
+import copy
 
 
 class LocalDocSearch:
@@ -44,7 +46,7 @@ class LocalDocSearch:
         return res
 
     def init_cfg(self, args):
-        self.rerank_top_k = 5
+        self.rerank_top_k = 3
         self.device = args.device
         if "gpu" == self.device:
             from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
@@ -114,38 +116,85 @@ class LocalDocSearch:
     
     def add_filename_to_docs(self, source_docs):
         for doc in source_docs:
-            doc.page_content = f"{doc.metadata['file_name']}\n{doc.page_content}"
+            doc.page_content = f"<<{doc.metadata['file_name']}>>:\n{doc.page_content}"
         return source_docs
 
     def del_filename_in_docs(self, source_docs):
         for doc in source_docs:
-            doc.page_content = doc.page_content.replace(f"{doc.metadata['file_name']}\n", "")
+            doc.page_content = doc.page_content.replace(f"<<{doc.metadata['file_name']}>>:\n", "")
         return source_docs
 
     
     def expand_page_by_context(self, doc, context_length=600, positions=[-1,1]):
+        # debug_logger.info(f"\n\n\nexpand_page_by_context doc: {doc}\n\n\n")
+        if ADD_FILENAME_TO_EMBEDDING:
+            file_name_tmp = doc.metadata['file_name']
+            file_name_tmp = "<<"+os.path.splitext(file_name_tmp)[0]+">>:\n"
+            doc.page_content = doc.page_content.replace(file_name_tmp, '')
+        
+        new_positions = []
         for position in positions:
             position_doc = self.faiss_client.get_neighbors_documents(doc, position)
-            if position_doc and position<0:
-                doc.page_content = position_doc.page_content+doc.page_content
-            elif position_doc and position>0:
-                doc.page_content = doc.page_content+position_doc.page_content            
+            if ADD_FILENAME_TO_EMBEDDING and position_doc:
+                file_name_tmp = position_doc.metadata['file_name']
+                file_name_tmp = "<<"+os.path.splitext(file_name_tmp)[0]+">>:\n"
+                position_doc.page_content = position_doc.page_content.replace(file_name_tmp, '')
+            
+            if position<0:
+                if position_doc:
+                    doc.page_content = position_doc.page_content+"\n"+doc.page_content
+                    new_positions.append(position-1)
+            elif position>0:
+                if position_doc:
+                    doc.page_content = doc.page_content+"\n"+position_doc.page_content
+                    new_positions.append(position+1)
+            else:
+                debug_logger.error(f"position error: {position}")
+                return doc
         
-        if len(doc.page_content) >= context_length:
+        if len(doc.page_content) >= context_length or len(new_positions)==0:
+            if ADD_FILENAME_TO_EMBEDDING:
+                doc.page_content = "<<"+os.path.splitext(doc.metadata['file_name'])[0]+">>:\n"+doc.page_content
+            # debug_logger.info(f"\n\nreturn expend doc: {doc}\n\n")
             return doc
         else:
-            return self.expand_page_by_context(doc, context_length=context_length, positions=[positions[0]-1, positions[1]+1])
+            return self.expand_page_by_context(doc, context_length=context_length, positions=new_positions)
     
     
-    async def local_doc_search(self, query, kb_ids, score_threshold=0.35):
+    async def local_doc_search(self, query, kb_ids, score_threshold=0.35, rerank: bool = True):
         source_documents = await self.get_source_documents(query, kb_ids)
         deduplicated_docs = self.deduplicate_documents(source_documents)
         
-        # debug_logger.info("add filename to docs")
-        # deduplicated_docs = self.add_filename_to_docs(deduplicated_docs)    # add file name
-        
         retrieval_documents = sorted(deduplicated_docs, key=lambda x: x.metadata['score'], reverse=True)
-        if len(retrieval_documents) > 1:
+        debug_logger.info(f"retrieval docs num: {len(retrieval_documents)}")
+        # debug_logger.info(f"retrieval docs: {retrieval_documents}")
+
+
+        # 对检索文档进行扩展
+        if SEARCH_EXPAND_CONTENT:
+
+            # for index in range(len(retrieval_documents)):
+            #     if len(retrieval_documents[index].page_content)< SEARCH_EXPAND_CONTENT_LENGTH:
+            #         debug_logger.info(f"before expand page by context: {len(retrieval_documents[index].page_content)}")
+            #         retrieval_documents[index] = copy.deepcopy(self.expand_page_by_context(retrieval_documents[index], context_length=SEARCH_EXPAND_CONTENT_LENGTH, positions=[1]))
+            #         debug_logger.info(f"after expand page by context: {len(retrieval_documents[index].page_content)}")
+            #         debug_logger.info(f"after expand page by context: {retrieval_documents[index].page_content}")
+            # debug_logger.info(f"\n\n\n expand retrieval docs: {retrieval_documents}")
+
+            expand_retrieval_documents=[]
+
+            for doc in retrieval_documents:
+                if len(doc.page_content)< SEARCH_EXPAND_CONTENT_LENGTH:
+                    # debug_logger.info(f"before expand page by context: {len(doc.page_content)}")
+                    doc = self.expand_page_by_context(doc, context_length=SEARCH_EXPAND_CONTENT_LENGTH, positions=[1])
+                    # debug_logger.info(f"after expand page by context: {len(doc.page_content)}")
+                    # debug_logger.info(f"after expand page by context: {doc.page_content}")
+                expand_retrieval_documents.append(copy.deepcopy(doc))
+            retrieval_documents = expand_retrieval_documents
+            # debug_logger.info(f"\n\n\n expand retrieval docs: {retrieval_documents}")
+        
+
+        if len(retrieval_documents) > 1 and rerank:
             debug_logger.info(f"use rerank, rerank docs num: {len(retrieval_documents)}")
             # rerank需要的query必须是改写后的, 不然会丢一些信息
             retrieval_documents = self.rerank_documents(query, retrieval_documents)
@@ -156,34 +205,8 @@ class LocalDocSearch:
                 retrieval_documents = tmp_documents
         
         retrieval_documents = retrieval_documents[: self.rerank_top_k]
-        debug_logger.info(f"local doc search retrieval_documents: {retrieval_documents}")
-        # return retrieval_documents
-
-        # 获取相邻的该文档的信息
-        for item in retrieval_documents:
-            if len(item.page_content) < 600:
-                debug_logger.info(f"before expand page by context: {len(item.page_content)}")
-                item = self.expand_page_by_context(item, context_length=600)
-                debug_logger.info(f"after expand page by context: {len(item.page_content)}")
+        debug_logger.info(f"\n\n\n rerank top{self.rerank_top_k} retrieval docs: {retrieval_documents}")
         return retrieval_documents
-        
-        # debug_logger.info("del filename in docs")
-        # retrieval_documents = self.del_filename_in_docs(retrieval_documents)
-        
-        # 对候选的文档，按照文档名再次进行rerank，按照score从高到低排序，将名称更相关的放在前面
-        # debug_logger.info(f"use filename rerank...")
-        # retrieval_documents_filename = []
-        # for item in retrieval_documents:
-        #     item.metadata["page_rerank_socre"] = item.metadata["score"] #保存原始的score
-        #     item.metadata["page_content"] = item.page_content
-        #     item.page_content=item.metadata['file_name']
-        #     retrieval_documents_filename.append(item)
-        # rerank_retrieval_documents_filename = self.rerank_documents(query, retrieval_documents_filename)
-        # for item in rerank_retrieval_documents_filename:
-        #     item.page_content=item.metadata['page_content']
-        #     del item.metadata['page_content']
-        # debug_logger.info(f"rerank_retrieval_documents_filename: {rerank_retrieval_documents_filename}")
-        # return rerank_retrieval_documents_filename
         
         
 
@@ -293,8 +316,8 @@ class LocalDocSearch:
         source_documents = sorted(source_documents, key=lambda x: x.metadata['score'], reverse=True)
         return source_documents
 
-    async def retrieve(self, query, kb_ids, need_web_search=False):
-        retrieval_documents = await self.local_doc_search(query, kb_ids)
+    async def retrieve(self, query, kb_ids, need_web_search=False, rerank: bool = False):
+        retrieval_documents = await self.local_doc_search(query, kb_ids, rerank=rerank)
         if need_web_search:
             retrieval_documents.extend(self.web_page_search(query, top_k=3))
             debug_logger.info(f"add web_search retrieval_documents: {retrieval_documents}")
@@ -302,12 +325,11 @@ class LocalDocSearch:
             debug_logger.info(f"add web_search reranked retrieval_documents: {retrieval_documents}")
         return retrieval_documents
 
-    async def get_knowledge_based_answer(self, query, kb_ids, 
-                                         streaming: bool = STREAMING,
+    async def get_knowledge_based_answer(self, query, kb_ids,
                                          rerank: bool = False):
         
         #retrieval_queries = [query]
-        retrieval_documents = await self.retrieve(query, kb_ids, need_web_search=False)
+        retrieval_documents = await self.retrieve(query, kb_ids, need_web_search=False, rerank=rerank)
 
         return retrieval_documents
         

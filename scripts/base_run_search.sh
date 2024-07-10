@@ -25,9 +25,9 @@ device_id=0
 workers=1
 
 # 使用getopts解析命令行参数
-while getopts ":q:d:i:w:" opt; do
+while getopts ":p:d:i:w:" opt; do
   case $opt in
-    q) qanything_port="$OPTARG"
+    p) qanything_port="$OPTARG"
     ;;
     d) device="$OPTARG"
     ;;
