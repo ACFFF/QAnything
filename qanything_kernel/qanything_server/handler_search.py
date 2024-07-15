@@ -489,6 +489,10 @@ async def list_docs(req: request):
     debug_logger.info("list_docs %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     debug_logger.info("kb_id: {}".format(kb_id))
+    not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
+    if not_exist_kb_ids:
+        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
+    
     data = []
     file_infos = local_doc_qa.mysql_client.get_files(user_id, kb_id)
     status_count = {}

@@ -185,11 +185,38 @@ class LocalDocSearch:
 
             for doc in retrieval_documents:
                 if len(doc.page_content)< SEARCH_EXPAND_CONTENT_LENGTH:
-                    # debug_logger.info(f"before expand page by context: {len(doc.page_content)}")
-                    doc = self.expand_page_by_context(doc, context_length=SEARCH_EXPAND_CONTENT_LENGTH, positions=[1])
-                    # debug_logger.info(f"after expand page by context: {len(doc.page_content)}")
-                    # debug_logger.info(f"after expand page by context: {doc.page_content}")
-                expand_retrieval_documents.append(copy.deepcopy(doc))
+                    # debug_logger.info(f"\n\nbefore expand page by context: {len(doc.page_content)}")
+                    # debug_logger.info(f"before expand page by context: {doc}")
+                    # doc = self.expand_page_by_context(doc, context_length=SEARCH_EXPAND_CONTENT_LENGTH, positions=[1])
+                    if ADD_FILENAME_TO_EMBEDDING:
+                        file_name_tmp = doc.metadata['file_name']
+                        file_name_tmp = "<<"+os.path.splitext(file_name_tmp)[0]+">>:\n"
+                        doc.page_content = doc.page_content.replace(file_name_tmp, '')
+                    
+                    # 往后扩充长度
+                    position = 1
+                    while len(doc.page_content)<SEARCH_EXPAND_CONTENT_LENGTH:
+                        position_doc = self.faiss_client.get_neighbors_documents(doc, position)
+                        if ADD_FILENAME_TO_EMBEDDING and position_doc:
+                            file_name_tmp = "<<"+os.path.splitext(position_doc.metadata['file_name'])[0]+">>:\n"
+                            position_doc.page_content = position_doc.page_content.replace(file_name_tmp, '')
+                        
+                        if position<0 and position_doc:
+                            doc.page_content = position_doc.page_content+"\n"+doc.page_content
+                        if position>0 and position_doc:
+                            doc.page_content = doc.page_content+"\n"+position_doc.page_content
+                        if position_doc is None:
+                            # debug_logger.warn(f"position error: {position}")
+                            break
+                        position += 1
+                    
+                    if ADD_FILENAME_TO_EMBEDDING:
+                        doc.page_content = file_name_tmp+doc.page_content
+
+                    # debug_logger.info(f"\n\nafter expand page by context: {len(doc.page_content)}")
+                    # debug_logger.info(f"after expand page by context: {doc}")
+                
+                expand_retrieval_documents.append(doc)
             retrieval_documents = expand_retrieval_documents
             # debug_logger.info(f"\n\n\n expand retrieval docs: {retrieval_documents}")
         

@@ -35,10 +35,29 @@ class SelfInMemoryDocstore(InMemoryDocstore):
         self._dict.update(texts)
 
 
-@lru_cache(FAISS_CACHE_SIZE)
+# @lru_cache(FAISS_CACHE_SIZE)
+# def load_vector_store(faiss_index_path, embeddings):
+#     debug_logger.info(f'load faiss index: {faiss_index_path}')
+#     return FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+
+
+faiss_cache_obj={}
+last_used_faiss_index_path = []
 def load_vector_store(faiss_index_path, embeddings):
+    if faiss_index_path in faiss_cache_obj.keys():
+        debug_logger.info(f'load faiss index in cache: {faiss_index_path}')
+        return faiss_cache_obj[faiss_index_path]
+
     debug_logger.info(f'load faiss index: {faiss_index_path}')
-    return FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+    faiss_cache_obj[faiss_index_path] = FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+
+    if faiss_index_path not in last_used_faiss_index_path:
+        last_used_faiss_index_path.append(faiss_index_path)
+    if len(last_used_faiss_index_path) > FAISS_CACHE_SIZE:
+        faiss_index_path_to_remove = last_used_faiss_index_path.pop(0)
+        del faiss_cache_obj[faiss_index_path_to_remove]
+
+    return faiss_cache_obj[faiss_index_path]
 
 
 class FaissClient:
@@ -86,8 +105,13 @@ class FaissClient:
         for doc, score in docs_with_score:
             doc.metadata['score'] = score
         docs = [doc for doc, score in docs_with_score]
-        docs_with_score = self.merge_docs(docs)
-        return docs_with_score
+        # docs_with_score = self.merge_docs(docs)
+        # return docs_with_score
+
+        import copy
+        docs_deepcopy = copy.deepcopy(docs)
+        docs_deepcopy = self.merge_docs(docs_deepcopy)
+        return docs_deepcopy
 
     def merge_docs(self, docs):
         # 把docs按照file_id进行合并，但是需要对所有file_id相同的doc根据chunk_id先排序，chunk_id相邻的doc合并
@@ -110,6 +134,7 @@ class FaissClient:
                             if not doc.page_content.startswith(file_name_tmp):
                                 debug_logger.error(f'doc not start with file name: {doc.page_content[:50]}{doc.metadata}')
                             doc.page_content = doc.page_content.replace(file_name_tmp, '')
+                        debug_logger.info(f'Merge doc: {merged_docs[-1].metadata["file_name"]} chunkid: {merged_docs[-1].metadata["chunk_id"]} and {doc.metadata["chunk_id"]}')
                         merged_docs[-1].page_content += '\n' + doc.page_content
                         merged_docs[-1].metadata['chunk_id'] = doc.metadata['chunk_id'] #注意，chunk_id以后面的为准，则merged后扩充只能往后扩充，往前则会重复
                         
