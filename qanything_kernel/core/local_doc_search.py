@@ -48,24 +48,25 @@ class LocalDocSearch:
     def init_cfg(self, args):
         self.rerank_top_k = 3
         self.device = args.device
-        if "gpu" == self.device:
+        if not self.device=="cpu":
+            self.device = self.device+":"+str(args.device_id)
+        
+        if args.backend == "onnx":
+            debug_logger.info(f"init onnx backend")
             from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
             from qanything_kernel.connector.embedding.embedding_onnx_backend import EmbeddingOnnxBackend
-            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(use_cpu=False)
-            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(use_cpu=False)
-        elif "cpu" == self.device:
-            from qanything_kernel.connector.rerank.rerank_onnx_backend import RerankOnnxBackend
-            from qanything_kernel.connector.embedding.embedding_onnx_backend import EmbeddingOnnxBackend
-            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(use_cpu=True)
-            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(use_cpu=True)
-        elif "npu" == self.device:
+            self.local_rerank_backend: RerankOnnxBackend = RerankOnnxBackend(device=self.device)
+            self.embeddings: EmbeddingOnnxBackend = EmbeddingOnnxBackend(device=self.device)     
+        elif args.backend == "torch":
+            debug_logger.info(f"init torch backend")
             from qanything_kernel.connector.rerank.rerank_torch_backend import RerankTorchBackend
             from qanything_kernel.connector.embedding.embedding_torch_backend import EmbeddingTorchBackend
-            self.local_rerank_backend: RerankTorchBackend = RerankTorchBackend(use_cpu=False, device=self.device+":"+str(args.device_id))
-            self.embeddings: EmbeddingTorchBackend = EmbeddingTorchBackend(use_cpu=False, device=self.device+":"+str(args.device_id))
+            self.local_rerank_backend: RerankTorchBackend = RerankTorchBackend(device=self.device)
+            self.embeddings: EmbeddingTorchBackend = EmbeddingTorchBackend(device=self.device)
         else:
-            debug_logger.info(f"error input device: {self.device}")
-            raise ValueError(f"error input device: {self.device}")
+            debug_logger.info(f"error input backend: {args.backend}")
+            raise ValueError(f"error input backend: {args.backend}")
+        
         self.mysql_client = KnowledgeBaseManager()
         self.ocr_reader = OCRQAnything(model_dir=OCR_MODEL_PATH, device="cpu")  # 省显存
         debug_logger.info(f"OCR DEVICE: {self.ocr_reader.device}")
@@ -161,8 +162,8 @@ class LocalDocSearch:
             return self.expand_page_by_context(doc, context_length=context_length, positions=new_positions)
     
     
-    async def local_doc_search(self, query, kb_ids, score_threshold=0.35, rerank: bool = True):
-        source_documents = await self.get_source_documents(query, kb_ids)
+    async def local_doc_search(self, query, kb_ids, score_threshold=0.35, rerank: bool = True, merge: bool = True):
+        source_documents = await self.get_source_documents(query, kb_ids, merge=merge)
         deduplicated_docs = self.deduplicate_documents(source_documents)
         
         retrieval_documents = sorted(deduplicated_docs, key=lambda x: x.metadata['score'], reverse=True)
@@ -261,7 +262,7 @@ class LocalDocSearch:
         return source_documents
 
 
-    async def get_source_documents(self, query, kb_ids, cosine_thresh=None, top_k=None):
+    async def get_source_documents(self, query, kb_ids, cosine_thresh=None, top_k=None, merge: bool = True):
         if not top_k:
             top_k = self.top_k
         source_documents = []
@@ -269,7 +270,7 @@ class LocalDocSearch:
         filter = lambda metadata: metadata['kb_id'] in kb_ids
         # filter = None
         debug_logger.info(f"query: {query}")
-        docs = await self.faiss_client.search(kb_ids, query, filter=filter, top_k=top_k)
+        docs = await self.faiss_client.search(kb_ids, query, filter=filter, top_k=top_k, merge=merge)
         debug_logger.info(f"query_docs: {len(docs)}")
         t2 = time.time()
         debug_logger.info(f"faiss search time: {t2 - t1}")
@@ -343,8 +344,8 @@ class LocalDocSearch:
         source_documents = sorted(source_documents, key=lambda x: x.metadata['score'], reverse=True)
         return source_documents
 
-    async def retrieve(self, query, kb_ids, need_web_search=False, rerank: bool = False):
-        retrieval_documents = await self.local_doc_search(query, kb_ids, rerank=rerank)
+    async def retrieve(self, query, kb_ids, need_web_search=False, rerank: bool = False, merge: bool = True):
+        retrieval_documents = await self.local_doc_search(query, kb_ids, rerank=rerank, merge=merge)
         if need_web_search:
             retrieval_documents.extend(self.web_page_search(query, top_k=3))
             debug_logger.info(f"add web_search retrieval_documents: {retrieval_documents}")
@@ -353,10 +354,11 @@ class LocalDocSearch:
         return retrieval_documents
 
     async def get_knowledge_based_answer(self, query, kb_ids,
-                                         rerank: bool = False):
+                                         rerank: bool = False,
+                                         merge: bool = True):
         
         #retrieval_queries = [query]
-        retrieval_documents = await self.retrieve(query, kb_ids, need_web_search=False, rerank=rerank)
+        retrieval_documents = await self.retrieve(query, kb_ids, need_web_search=False, rerank=rerank, merge=merge)
 
         return retrieval_documents
         

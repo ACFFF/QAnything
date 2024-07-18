@@ -92,7 +92,7 @@ class FaissClient:
         debug_logger.info(f'FAISS load kb_ids: {kb_ids}')
 
     async def search(self, kb_ids, query, filter: Optional[Union[Callable, Dict[str, Any]]] = None,
-                     top_k=VECTOR_SEARCH_TOP_K):
+                     top_k=VECTOR_SEARCH_TOP_K, merge: bool = True):
         if self.faiss_client is None or self.kb_ids != kb_ids:
             self._load_kb_to_memory(kb_ids)
         # filter = {'page': 1}
@@ -110,7 +110,9 @@ class FaissClient:
 
         import copy
         docs_deepcopy = copy.deepcopy(docs)
-        docs_deepcopy = self.merge_docs(docs_deepcopy)
+        if merge:
+            debug_logger.info("use merge docs")
+            docs_deepcopy = self.merge_docs(docs_deepcopy)
         return docs_deepcopy
 
     def merge_docs(self, docs):
@@ -216,6 +218,8 @@ class FaissClient:
             position_doc = self.faiss_client.docstore.search(position_doc_docstore_id)
         # debug_logger.info(f"position_doc_info: {position_doc_info}")
         # debug_logger.info(f"position_doc:{position_doc}")
-
-        return position_doc
+        
+        import copy
+        position_doc_deepcopy = copy.deepcopy(position_doc)
+        return position_doc_deepcopy
         

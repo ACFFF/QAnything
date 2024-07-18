@@ -27,13 +27,14 @@ parser.add_argument('--port', dest='port', default=8777, type=int, help='set por
 parser.add_argument('--workers', dest='workers', default=4, type=int, help='sanic server workers number')
 parser.add_argument('--device', dest='device', default='npu', help='显卡设备，可以设置为npu, gpu, cpu')
 parser.add_argument('--device_id', dest='device_id', default='0', help='cuda device id for qanything server')
+parser.add_argument('--backend', dest='backend', default='onnx', help='运行模型的推理后端，可以设置为onnx, torch')
 parser.add_argument('--offline', dest='offline', default=False, help='offline mode')
 args = parser.parse_args()
 
 # 针对离线推理环境，需要设置tiktoken以及unstructured库部分组件联网检查的问题
 if args.offline:
     # 设置tiktoken联网检查为False
-    tiktoken_cache_dir = "/workspace/qanything_kernel/model/tiktoken_model"
+    tiktoken_cache_dir = "/workspace/qanything_local/model/tiktoken_model"
     os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
     
     # 设置unstructured联网检查为False
@@ -116,16 +117,16 @@ app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # ta
 
 if __name__ == "__main__":
     
-    try:
-        # 尝试以指定的workers数量启动应用
-        app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
-    except Exception as e:
-        debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
-        # 如果出现异常，则退回到单进程模式
-        app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    # try:
+    #     # 尝试以指定的workers数量启动应用
+    #     app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
+    # except Exception as e:
+    #     debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
+    #     # 如果出现异常，则退回到单进程模式
+    #     app.run(host=args.host, port=args.port, single_process=True, access_log=False)
     
     # 由于有用户启动时上下文环境报错，使用单进程模式：
-    # app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    app.run(host=args.host, port=args.port, single_process=True, access_log=False)
 
 
 

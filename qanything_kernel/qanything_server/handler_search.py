@@ -404,10 +404,12 @@ async def question_rag_search(req: request):
     kb_ids = safe_get(req, 'kb_ids')
     question = safe_get(req, 'question')
     rerank = safe_get(req, 'rerank', default=True)
+    merge = safe_get(req, 'merge', default=True)
     debug_logger.info('rerank %s', rerank)
     debug_logger.info("question: %s", question)
     debug_logger.info("kb_ids: %s", kb_ids)
     debug_logger.info("user_id: %s", user_id)
+    debug_logger.info("merge: %s", merge)
 
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, kb_ids)
     if not_exist_kb_ids:
@@ -451,9 +453,10 @@ async def question_rag_search(req: request):
             date = datetime.now().strftime("%Y-%m-%d")
             save_api_call_to_csv(date, "question_rag_search", req.json, return_result, t2-t1)
             debug_logger.info(f"question_rag_search time cost:{t2-t1}")
+            return sanic_json(return_result)
         except Exception as e:
             debug_logger.warn(f"save api 失败，异常信息：{e}")
-        return sanic_json(return_result)
+        
 
 
 

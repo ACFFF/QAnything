@@ -8,24 +8,27 @@ import torch
 
 
 class EmbeddingTorchBackend(EmbeddingBackend):
-    def __init__(self, use_cpu: bool = False, device: str = "cpu"):
-        super().__init__(use_cpu)
+    def __init__(self, device: str = "cpu"):
+        super().__init__(device=="cpu")
         self.return_tensors = "pt"
         self.device = device
         self._model = AutoModel.from_pretrained(LOCAL_EMBED_PATH, return_dict=False)
         
-        if use_cpu:
+        if "cpu" in device:
             self.device = torch.device('cpu')
             self._model = self._model.to(self.device)
+        elif 'npu' in device:
+            import torch_npu
+            self.device = device
+            torch_npu.npu.set_device(self.device)
+            self._model = self._model.to(self.device)
+        elif 'cuda' in device:
+            self.device = torch.device(device)
+            torch.cuda.set_device(self.device)
+            self._model = self._model.to(self.device)
         else:
-            if 'npu' in device:
-                import torch_npu
-                self.device = device
-                torch_npu.npu.set_device(self.device)                
-                self._model = self._model.to(self.device)
-            else:
-                debug_logger.error("Unsupported device: {}".format(device))
-                raise NotImplementedError
+            debug_logger.error("Unsupported device: {}".format(device))
+            raise NotImplementedError
             
         print("embedding device:", self.device)
 

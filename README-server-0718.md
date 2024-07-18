@@ -12,7 +12,8 @@
 | [/api/qanything/question_rag_search](#问答检索) | POST | 问答接口 |
 | [/api/qanything/get_files_statu](#获取指定文件状态) | POST | 获取指定文件状态 |
 | [/api/qanything/upload_faqs](#上传faq) | POST | 上传FAQ(docker版本暂时不可用) |
-
+| [/api/qanything/list_knowledge_base](#获取知识库列表) | POST | 知识库列表 |
+| [/api/qanything/list_files](#获取知识库文件列表) | POST | 文件列表 |
 
 
 
@@ -254,6 +255,7 @@ curl -X POST "http://<your_host>:<your_port>/api/qanything/document_parser_embed
 | user_id | string | 是 | 用户id |
 | kb_ids  | []string | 是 | 检索的知识库id列表 |
 | question| string | 是 | 待检索问题 |
+| merge | bool | 否 | 默认为true，是否要将候选中同一文件的相邻chunk进行内容合并 |
 
 ```
     curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/question_rag_search \
@@ -351,3 +353,86 @@ curl -X POST "http://<your_host>:<your_port>/api/qanything/document_parser_embed
 
 ```
 
+### 获取知识库列表
+
+* 请求参数和示例
+
+| 参数名 | 类型 | 是否必须 | 说明 |
+| --- | --- | --- | --- |
+| user_id | string | 是 | 用户id |
+
+```
+    curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/list_knowledge_base \
+    -d '{"user_id": "123456"}'
+```
+
+* 返回结果
+
+| 参数名 | 类型 | 说明 |
+| ----- | --- | --- |
+| code | int    | 200表示成功，其他表示失败 |
+| data | List | 知识库列表 |
+
+
+```
+{
+    "code":200,
+    "data":[
+        {
+            "kb_id":"KB6dae785cdd5d47a997e890521acbe1c4",
+            "kb_name":"rag2"
+        },{
+            "kb_id":"KB6dae785cdd5d47a997e890521acbe1c5",
+            "kb_name":"rag3"
+        }
+    ]
+}
+```
+
+
+
+### 获取知识库文件列表
+
+* 请求参数和示例
+
+| 参数名 | 类型 | 是否必须 | 说明 |
+| --- | --- | --- | --- |
+| user_id | string | 是 | 用户id |
+| kb_id   | string | 是 | 需要获取知识库文件列表的知识库id |
+
+```
+    curl -X POST -H "Content-Type: application/json" http://ip:port/api/qanything/list_files \
+    -d '{"user_id": "123456", "kb_id": "KB123456789"}'
+```
+
+* 返回结果
+
+| 参数名 | 类型 | 说明 |
+| ----- | --- | --- |
+| code | int    | 200表示成功，其他表示失败 |
+| msg  | string | 返回结果说明 |
+| data | List | 知识库文件列表 |
+
+
+```
+{
+    "code": 200,
+    "msg": "success",
+    "data": {
+        "total": {
+            "green": 1
+        },
+        "details": [
+            {
+                "file_id": "file_id5",
+                "file_name": "xxx5.txt",
+                "status": "green",
+                "bytes": -1,
+                "content_length": 1677,
+                "timestamp": "202407181109",
+                "msg": "上传成功"
+            }
+        ]
+    }
+}
+```

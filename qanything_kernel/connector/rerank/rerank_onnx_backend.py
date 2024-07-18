@@ -6,17 +6,48 @@ import numpy as np
 
 
 class RerankOnnxBackend(RerankBackend):
-    def __init__(self, use_cpu: bool = False):
-        super().__init__(use_cpu)
+    def __init__(self, device: str = "cpu"):
+        super().__init__(device=="cpu")
+        self.device = device
         self.return_tensors = "np"
         # 创建一个ONNX Runtime会话设置，使用GPU执行
         sess_options = onnxruntime.SessionOptions()
         sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-        if use_cpu:
+        if "cpu" in self.device:
             providers = ['CPUExecutionProvider']
-        else:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        elif "gpu" in self.device:
+            device_id = self.device.split(":")[-1]
+            if device_id.isdigit():
+                device_id = int(device_id)
+            else:
+                device_id = 0
+            providers = [
+                (
+                    'CUDAExecutionProvider',
+                    {
+                        "device_id": device_id
+                    }
+                 )
+            ]
+        elif "npu" in self.device:
+            device_id = self.device.split(":")[-1]
+            if device_id.isdigit():
+                device_id = int(device_id)
+            else:
+                device_id = 0
+            providers = [
+                (
+                    "CANNExecutionProvider",
+                    {
+                        "device_id": device_id,
+                        "arena_extend_strategy": "kNextPowerOfTwo",
+                        "npu_mem_limit": 20 * 1024 * 1024 * 1024,
+                        "enable_cann_graph": True,
+                    },
+                )
+            ]
         self.session = onnxruntime.InferenceSession(LOCAL_RERANK_MODEL_PATH, sess_options, providers=providers)
+        debug_logger.info(f"RerankOnnxBackend initialized with device: {self.device}")
 
     def inference(self, batch):
         # 准备输入数据
