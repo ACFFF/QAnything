@@ -1,7 +1,8 @@
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore import InMemoryDocstore
 from langchain_core.documents import Document
-from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, FAISS_LOCATION, FAISS_CACHE_SIZE, ADD_FILENAME_TO_EMBEDDING
+from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, FAISS_LOCATION, FAISS_CACHE_SIZE, ADD_FILENAME_TO_EMBEDDING, \
+    VECTOR_SEARCH_SCORE_THRESHOLD
 from typing import Optional, Union, Callable, Dict, Any, List, Tuple
 from langchain_community.vectorstores.faiss import dependable_faiss_import
 from qanything_kernel.utils.custom_log import debug_logger
@@ -41,22 +42,22 @@ class SelfInMemoryDocstore(InMemoryDocstore):
 #     return FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
 
 
-faiss_cache_obj={}
-last_used_faiss_index_path = []
+# 存到内存中，减少读取时间
+from collections import OrderedDict
+faiss_cache_obj=OrderedDict()
 def load_vector_store(faiss_index_path, embeddings):
     if faiss_index_path in faiss_cache_obj.keys():
         debug_logger.info(f'load faiss index in cache: {faiss_index_path}')
+        faiss_cache_obj.move_to_end(faiss_index_path)
         return faiss_cache_obj[faiss_index_path]
 
     debug_logger.info(f'load faiss index: {faiss_index_path}')
     faiss_cache_obj[faiss_index_path] = FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
 
-    if faiss_index_path not in last_used_faiss_index_path:
-        last_used_faiss_index_path.append(faiss_index_path)
-    if len(last_used_faiss_index_path) > FAISS_CACHE_SIZE:
-        faiss_index_path_to_remove = last_used_faiss_index_path.pop(0)
-        del faiss_cache_obj[faiss_index_path_to_remove]
 
+    if len(faiss_cache_obj) > FAISS_CACHE_SIZE:
+        faiss_index_path_to_remove = faiss_cache_obj.popitem(last=False)[0]
+        debug_logger.info(f'remove faiss index from cache: {faiss_index_path_to_remove}')
     return faiss_cache_obj[faiss_index_path]
 
 
@@ -66,6 +67,7 @@ class FaissClient:
         self.embeddings = embeddings
         self.faiss_client: FAISS = None
         self.kb_ids: List[str] = []
+        self.save_faiss_status = False
 
     def _load_kb_to_memory(self, kb_ids):
         debug_logger.info(f'_load_kb_to_memory kb_ids: {kb_ids}')
@@ -100,7 +102,8 @@ class FaissClient:
             filter = {}
         debug_logger.info(f'FAISS search: {query}, {filter}, {top_k}')
         docs_with_score = await self.faiss_client.asimilarity_search_with_score(query, k=top_k, filter=filter,
-                                                                                fetch_k=200)
+                                                                                fetch_k=200,
+                                                                                score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD)
         debug_logger.info(f'FAISS search result number: {len(docs_with_score)}')
         for doc, score in docs_with_score:
             doc.metadata['score'] = score
@@ -159,6 +162,12 @@ class FaissClient:
         return merged_docs
 
     async def add_document(self, docs):
+        # 判断是否有文档正在保存，如果有则等待其完成后再保存添加
+        while self.save_faiss_status:
+            import asyncio
+            await asyncio.sleep(1)
+        self.save_faiss_status = True
+        
         kb_id = docs[0].metadata['kb_id']
         if self.faiss_client is None or self.kb_ids != [kb_id]:
             self._load_kb_to_memory([kb_id])
@@ -174,6 +183,8 @@ class FaissClient:
         self.faiss_client.save_local(faiss_index_path)
         debug_logger.info(f'save faiss index: {faiss_index_path}')
         os.chmod(os.path.dirname(faiss_index_path), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        
+        self.save_faiss_status = False
         return add_ids
 
     def delete_documents(self, kb_id, file_ids=None):

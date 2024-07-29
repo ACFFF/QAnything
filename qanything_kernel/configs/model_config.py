@@ -102,7 +102,7 @@ FAISS_CACHE_SIZE = 10
 # LOCAL_LLM_MODEL_NAME = llm_api_serve_model
 # LOCAL_LLM_MAX_LENGTH = 4096
 
-# LOCAL_RERANK_PATH = os.path.join(root_path, 'qanything_kernel/connector/rerank', 'bce-reranker-base_v1')
+# LOCAL_RERANK_PATH = os.path.join(root_path, 'model', 'bce-reranker-base_v1')
 LOCAL_RERANK_PATH = os.path.join(root_path, 'model', 'rerank_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_RERANK_REPO = "maidalun/bce-reranker-base_v1"
@@ -114,7 +114,7 @@ print('LOCAL_RERANK_REPO:', LOCAL_RERANK_REPO)
 LOCAL_RERANK_MODEL_NAME = 'rerank'
 LOCAL_RERANK_MAX_LENGTH = 512
 
-# LOCAL_EMBED_PATH = os.path.join(root_path, 'qanything_kernel/connector/embedding', 'bce-embedding-base_v1')
+# LOCAL_EMBED_PATH = os.path.join(root_path, 'model', 'bce-embedding-base_v1')
 LOCAL_EMBED_PATH = os.path.join(root_path, 'model', 'embedding_model_configs_v0.0.1')
 if os_system == 'Darwin':
     LOCAL_EMBED_REPO = "maidalun/bce-embedding-base_v1"
@@ -164,6 +164,6 @@ BOT_WELCOME = "您好，我是您的专属机器人，请问有什么可以帮�
 
 
 
-ADD_FILENAME_TO_EMBEDDING = True
-SEARCH_EXPAND_CONTENT = True
+ADD_FILENAME_TO_EMBEDDING = False
+SEARCH_EXPAND_CONTENT = False
 SEARCH_EXPAND_CONTENT_LENGTH = 600

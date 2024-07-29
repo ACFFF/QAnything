@@ -402,7 +402,13 @@ async def question_rag_search(req: request):
     debug_logger.info('question_rag_search %s', user_id)
 
     kb_ids = safe_get(req, 'kb_ids')
+    if kb_ids is None:
+        return sanic_json({"code": 2002, "msg": f'输入非法！kb_ids不正确，请检查！'})
+    
     question = safe_get(req, 'question')
+    if question is None or question=="":
+        return sanic_json({"code": 2002, "msg": f'输入非法！question不正确，请检查！'})
+    
     rerank = safe_get(req, 'rerank', default=True)
     merge = safe_get(req, 'merge', default=True)
     debug_logger.info('rerank %s', rerank)
@@ -432,7 +438,8 @@ async def question_rag_search(req: request):
     else:
         retrieval_documents = await local_doc_qa.get_knowledge_based_answer(query=question, 
                                                                         kb_ids=kb_ids,
-                                                                        rerank=rerank)
+                                                                        rerank=rerank,
+                                                                        merge=merge)
 
         
         chat_data = {'user_id': chat_user_id, 'kb_ids': kb_ids, 'query': question,

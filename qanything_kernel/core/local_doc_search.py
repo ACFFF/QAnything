@@ -82,6 +82,9 @@ class LocalDocSearch:
             try:
                 debug_logger.info(f'start split {local_file.file_name}')
                 local_file.split_file_to_docs(self.get_ocr_result)
+                # 新增将split后的docs保存到本地文档中，便于可以查看切片后的文档内容
+                local_file.save_docs_to_local()
+
                 if local_file.file_name.endswith('.faq'):
                     content_length = len(local_file.docs[0].metadata['faq_dict']['question']) + len(local_file.docs[0].metadata['faq_dict']['answer'])
                 else:

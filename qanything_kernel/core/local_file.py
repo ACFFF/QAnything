@@ -373,3 +373,16 @@ class LocalFile:
         else:
             debug_logger.info('langchain analysis docs is empty!')
         self.docs = new_docs
+
+    
+
+    def save_docs_to_local(self):
+        save_docs_content = ""
+        save_path = os.path.join(UPLOAD_ROOT_PATH, self.user_id, self.kb_id, self.file_id, "docs")
+        os.makedirs(save_path, exist_ok=True)
+        for doc in self.docs: 
+            save_docs_content += str(doc.metadata)+"\npage_content:\n"+doc.page_content
+            save_docs_content += "\n"+"="*50+"\n"*5
+        with open(os.path.join(save_path, "docs.txt"), "w", encoding="utf-8") as f:
+            f.write(save_docs_content)
+        debug_logger.info("save docs to local success!")

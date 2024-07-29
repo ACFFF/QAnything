@@ -1,3 +1,5 @@
+import os
+import uuid
 import sys
 import json
 import requests
@@ -5,8 +7,10 @@ import requests
 function_list=["document", "new_knowledge_base", "document_parser", "document_parser_embedding", "delete_knowledge_base", "question_rag_search",
            "list_kbs", "list_docs", "delete_docs", "get_total_status", "upload_faqs", "get_qa_info", "get_files_statu", "chunk_embedding"]
 question=""
-
-
+user_id=""
+kb_id=""
+file_id=""
+file_path=""
 
 
 def document(host, port):
@@ -14,21 +18,28 @@ def document(host, port):
     print("request url: ",url)
     try:
         response = requests.request("GET", url)
-        data=json.loads(response.text)
-        data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
-        print(data_dumps)
+        print(response.text)
+        # data=json.loads(response.text)
+        # data_dumps = json.dumps(data, ensure_ascii=False, indent=4)
+        # print(data_dumps)
     except Exception as e:
         print("Error:", e)
 
 
 def new_knowledge_base(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     print("new_knowledge_base")
     url = f"http://{host}:{port}/api/qanything/new_knowledge_base"
     headers = {
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1", "kb_name": "区公安分局“答”板块"}
+    payload = {"user_id": user_id, "kb_id": kb_id}
+    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c2", "kb_name": "残联政策"}
+    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c3", "kb_name": "发改局政策文件"}
+    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4", "kb_name": "区公安分局“答”板块"}
     print("prompt:", payload)
 
     try:
@@ -41,12 +52,15 @@ def new_knowledge_base(host, port):
 
 
 def delete_knowledge_base(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/delete_knowledge_base"
     headers = {
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1", "file_ids": ["d1315e2e9bc64c67b8202466ce1ae75b"]}
+    payload = {"user_id": user_id, "kb_id": kb_id}
     print("prompt:", payload)
 
     try:
@@ -59,12 +73,16 @@ def delete_knowledge_base(host, port):
 
 
 def list_kbs(host, port):
+    global user_id
+    if user_id == "":
+        raise ValueError("user_id is empty")
     url = f"http://{host}:{port}/api/qanything/list_knowledge_base"
     headers = {
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": "zzp"}
+    # payload = {"user_id": "zzp"}
+    payload = {"user_id": user_id}
     print("prompt:", payload)
 
     try:
@@ -77,15 +95,15 @@ def list_kbs(host, port):
 
 
 def list_docs(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/list_files"
     headers = {
         "Content-Type": "application/json"
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c2"}
-    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4"}
-    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5"}
-    
+    payload = {"user_id": user_id, "kb_id": kb_id}    
     print("prompt:", payload)
 
     try:
@@ -98,12 +116,15 @@ def list_docs(host, port):
 
 
 def get_files_statu(host, port):
+    global user_id, kb_id, file_id
+    if user_id == "" or kb_id=="" or file_id=="":
+        raise ValueError("user_id or kb_id or file_id is empty")
     url = f"http://{host}:{port}/api/qanything/get_files_statu"
     headers = {
         "Content-Type": "application/json"
     }
 
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c9", "file_ids": ["b043fe8274f54bdc98f0df75a1776339","0eed7f98bb274400ab5507b36818c69e"]}
+    payload = {"user_id": user_id, "kb_id": kb_id, "file_ids": [file_id]}
     print("prompt:", payload)
 
     try:
@@ -116,13 +137,15 @@ def get_files_statu(host, port):
         print("Error:", e)
 
 
-
 def document_parser(host, port):
+    global user_id, file_path
+    if user_id == "" or file_path=="":
+        raise ValueError("user_id or file_path is empty")
     url = f"http://{host}:{port}/api/qanything/document_parser"
 
-    payload = {"user_id": "zzp"}
+    payload = {"user_id": user_id}
     print("prompt:", payload)
-    files=[('file', open('./docx_data/12345日报/2024149362154.pdf','rb'))]
+    files=[('file', open(file_path,'rb'))]
 
     try:
         response = requests.request("POST", url, data=payload, files=files)
@@ -134,26 +157,20 @@ def document_parser(host, port):
         print("Error:", e)
 
 
-import os
-import uuid
 def document_parser_embedding(host, port):
-    url = f"http://{host}:{port}/api/qanything/document_parser_embedding"
-    # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5", "mode": "soft", "file_ids": "124"}
-    # files=[('files',open('./docx_data/12345日报/2024258236895.pdf','rb'))]
-    # files=[('files', open('./docx_data/12345日报/2024149362154.pdf','rb'))]
-
-    # folder_path = "./docx_data/12345日报/"  # 文件所在文件夹，注意是文件夹！！
-    folder_path = "/media/darren/F5E7B706BE167807/xinjin_data/区公安分局“答”板块/"
-    # folder_path = "/media/darren/F5E7B706BE167807/xinjin_data/不动产"
+    global user_id, kb_id, file_path
+    if user_id == "" or kb_id=="" or file_path=="":
+        raise ValueError("user_id or kb_id or file_path is empty")
+    url = f"http://{host}:{port}/api/qanything/document_parser_embedding"    
     payload = {
-        "user_id": "zzp",
-        "kb_id": "KB6dae785cdd5d47a997e890521acbe1c1",
+        "user_id": user_id,
+        "kb_id": kb_id,
         "mode": "soft"
     }
 
     files = []
     file_ids = []
-    for root, dirs, file_names in os.walk(folder_path):
+    for root, dirs, file_names in os.walk(file_path):
         for file_name in file_names:
             # if file_name.endswith(".md"):  # 这里只上传后缀是md的文件，请按需修改，支持类型：
             file_path = os.path.join(root, file_name)
@@ -161,7 +178,6 @@ def document_parser_embedding(host, port):
             file_ids.append(str(uuid.uuid4().hex))
         
     payload["file_ids"] = ",".join(file_ids)
-
     print("payload:",payload)
     try:
         response = requests.post(url, data=payload, files=files)
@@ -174,8 +190,11 @@ def document_parser_embedding(host, port):
 
 
 def chunk_embedding(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/chunk_embedding"
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5", "file_id":"file_id", "file_name":"xxx.txt"}
+    payload = {"user_id": user_id, "kb_id": kb_id}
     
     chunk_datas = ["""OpenCV（Open Source Computer Vision）是一个开源的计算机视觉和机器学习软件库，广泛应用于图像处理和计算机视觉领域。以下是对OpenCV库的详细介绍：
 
@@ -237,9 +256,6 @@ Docker的总体架构是一个C/S模式的架构，用户通过Docker Client与D
 总之，Docker通过其强大的功能和灵活的应用场景，已经成为现代软件开发和运维中不可或缺的工具之一。
 """]
     payload["chunk_datas"] =chunk_datas
-
-    
-
     print("payload:",payload)
     try:
         response = requests.post(url, json=payload)
@@ -252,8 +268,11 @@ Docker的总体架构是一个C/S模式的架构，用户通过Docker Client与D
 
 
 def delete_docs(host, port):
+    global user_id, kb_id, file_id
+    if user_id == "" or kb_id=="" or file_id=="":
+        raise ValueError("user_id or kb_id or file_id is empty")
     url = f"http://{host}:{port}/api/qanything/delete_files"
-    payload = {"user_id": "zzp", "kb_id":"KB6dae785cdd5d47a997e890521acbe1c5", "file_ids": ["124"]}
+    payload = {"user_id": user_id, "kb_id": kb_id, "file_ids": [file_id]}
     print("prompt:", payload)
 
     try:
@@ -266,20 +285,15 @@ def delete_docs(host, port):
 
 
 def question_rag_search(host, port):
+    global user_id, kb_id, question
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/question_rag_search"
-    global question
     if question=="":
         question = input("请输入问题：")
         print("问题：", question)
 
-    # payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c5"], "question": "如何使用docker"}
-    # payload = {'user_id': '6c087e71-3101-48e4-aa29-07ef1a38055b', 'kb_ids': ['KB568e4887f73643a8847227c474903cf3'], 'question': '办理离休干部入户'}
-    # headers = {
-    #     "Content-Type": "application/json",
-    # }
-
-    payload = {"user_id": "zzp", "kb_ids": ["KB6dae785cdd5d47a997e890521acbe1c1", "KB6dae785cdd5d47a997e890521acbe1c2"], 
-               "question": question}
+    payload = {"user_id": user_id, "question": question, "kb_ids": [kb_id], "merge": False}
     print("payload:",payload)
 
     try:
@@ -292,8 +306,11 @@ def question_rag_search(host, port):
 
 
 def get_total_status(host, port):
+    global user_id
+    if user_id == "":
+        raise ValueError("user_id is empty")
     url = f"http://{host}:{port}/api/qanything/get_total_status"
-    payload = {"user_id": "zzp"}
+    payload = {"user_id": user_id}
     print("prompt:", payload)
 
     try:
@@ -307,10 +324,13 @@ def get_total_status(host, port):
 
 
 def upload_faqs(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/upload_faqs"
     payload = {
-        "user_id": "zzp", 
-        "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4", 
+        "user_id": user_id, 
+        "kb_id": kb_id, 
         "faqs": [{"question": "如何使用python", "answer": "python是一种编程语言，可以用来开发各种应用程序。参考教程：https://www.runoob.com/python3/python3-tutorial.html"}, 
                  {"question": "如何使用docker", "answer": "Docker是一个开源的应用容器引擎，参考教程：https://www.runoob.com/docker/docker-tutorial.html"}]}
     print("prompt:", payload)
@@ -325,10 +345,12 @@ def upload_faqs(host, port):
         print("Error:", e)
 
 
-
 def get_qa_info(host, port):
+    global user_id, kb_id
+    if user_id == "" or kb_id=="":
+        raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/get_qa_info"
-    payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c5"}
+    payload = {"user_id": user_id, "kb_id": kb_id}
     print("prompt:", payload)
 
     try:
@@ -344,7 +366,7 @@ def get_qa_info(host, port):
 
 def usage():
     print("Usage:")
-    print(f"python {sys.argv[0]} --api=\"api_name\" [--host=0.0.0.0 --port=8777]")
+    print(f"python {sys.argv[0]} --api=\"api_name\" [--host=0.0.0.0 --port=8777 --user_id=xxx --kb_id=xxx --file_id=xxx --file_path=xxx]")
     print("可用的api：", function_list)
 
 
@@ -352,7 +374,7 @@ def usage():
 
 
 if __name__ == "__main__":
-    host = "0.0.0.0"
+    host = "127.0.0.1" #"0.0.0.0"
     port = 8777
     api = ""
     
@@ -368,6 +390,16 @@ if __name__ == "__main__":
             api = arg.split('=')[1]
         elif arg.startswith('--question='):
             question = arg.split('=')[1]
+        elif arg.startswith('--user_id='):
+            user_id = arg.split('=')[1]
+        elif arg.startswith('--kb_id='):
+            kb_id = arg.split('=')[1]
+        elif arg.startswith('--file_id='):
+            file_id = arg.split('=')[1]
+        elif arg.startswith('--file_path='):
+            file_path = arg.split('=')[1]
+        else:
+            print(f"Unknown argument: {arg}")
         
             
     print(f"host: {host}, port: {port}")
@@ -377,6 +409,7 @@ if __name__ == "__main__":
         eval(api)(host, port)
     else:
         print(f"api:{api} is not exsit.")
+        usage()
         
 
 

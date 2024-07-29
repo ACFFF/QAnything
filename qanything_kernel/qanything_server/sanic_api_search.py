@@ -117,16 +117,16 @@ app.add_route(upload_faqs, "/api/qanything/upload_faqs", methods=['POST'])  # ta
 
 if __name__ == "__main__":
     
-    # try:
-    #     # 尝试以指定的workers数量启动应用
-    #     app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
-    # except Exception as e:
-    #     debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
-    #     # 如果出现异常，则退回到单进程模式
-    #     app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    try:
+        # 尝试以指定的workers数量启动应用
+        app.run(host=args.host, port=args.port, workers=args.workers, access_log=False)
+    except Exception as e:
+        debug_logger.info(f"启动多worker模式失败: {e}，尝试以单进程模式启动。")
+        # 如果出现异常，则退回到单进程模式
+        app.run(host=args.host, port=args.port, single_process=True, access_log=False)
     
     # 由于有用户启动时上下文环境报错，使用单进程模式：
-    app.run(host=args.host, port=args.port, single_process=True, access_log=False)
+    # app.run(host=args.host, port=args.port, single_process=True, access_log=False)
 
 
 

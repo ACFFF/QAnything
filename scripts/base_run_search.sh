@@ -20,7 +20,7 @@ update_or_append_to_env() {
 system="Linux"
 milvus_port=19530
 qanything_port=8777
-device="cpu"
+device="gpu"
 device_id=0
 workers=1
 
