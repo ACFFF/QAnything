@@ -82,6 +82,7 @@ class LocalDocSearch:
             try:
                 debug_logger.info(f'start split {local_file.file_name}')
                 local_file.split_file_to_docs(self.get_ocr_result)
+                
                 # 新增将split后的docs保存到本地文档中，便于可以查看切片后的文档内容
                 local_file.save_docs_to_local()
 
@@ -107,6 +108,9 @@ class LocalDocSearch:
                 continue
         debug_logger.info(
             f"insert_to_faiss: success num: {len(success_list)}, failed num: {len(failed_list)}")
+        
+        # 更新faiss缓存文件状态
+        self.faiss_client.delete_faiss_cache(kb_id)
 
     def deduplicate_documents(self, source_docs):
         unique_docs = set()
@@ -236,7 +240,7 @@ class LocalDocSearch:
                 retrieval_documents = tmp_documents
         
         retrieval_documents = retrieval_documents[: self.rerank_top_k]
-        debug_logger.info(f"\n\n\n rerank top{self.rerank_top_k} retrieval docs: {retrieval_documents}")
+        # debug_logger.info(f"\n\n\n rerank top{self.rerank_top_k} retrieval docs: {retrieval_documents}\n\n\n ")
         return retrieval_documents
         
         
@@ -284,7 +288,7 @@ class LocalDocSearch:
                 nos_keys = faq_dict.get('nos_keys')
                 doc.metadata['nos_keys'] = nos_keys
             doc.metadata['retrieval_query'] = query  # 添加查询到文档的元数据中
-            doc.metadata['embed_version'] = self.embeddings.getModelVersion
+            # doc.metadata['embed_version'] = self.embeddings.getModelVersion
             source_documents.append(doc)
         if cosine_thresh:
             source_documents = [item for item in source_documents if float(item.metadata['score']) > cosine_thresh]

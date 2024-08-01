@@ -111,33 +111,37 @@ async def document(req: request):
     return sanic_text(description)
 
 
+def return_sanic(return_result):
+    data_dumps = json.dumps(return_result, ensure_ascii=False, indent=4)
+    debug_logger.info(f"return_sanic: {data_dumps}\n\n\n")
+    return sanic_json(return_result)
 
 
 async def new_knowledge_base(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("new_knowledge_base %s", user_id)
     kb_name = safe_get(req, 'kb_name')
     default_kb_id = 'KB' + uuid.uuid4().hex
     kb_id = safe_get(req, 'kb_id', default_kb_id)
     if kb_id[:2] != 'KB':
-        return sanic_json({"code": 2001, "msg": "fail, kb_id must start with 'KB'"})
+        return return_sanic({"code": 2001, "msg": "fail, kb_id must start with 'KB'"})
     
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
     if not not_exist_kb_ids:
-        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} already exist".format(kb_id)})
+        return return_sanic({"code": 2003, "msg": "fail, knowledge Base {} already exist".format(kb_id)})
 
     _kb_id, status = local_doc_qa.mysql_client.new_knowledge_base(kb_id, user_id, kb_name)
     if _kb_id is None:
-        return sanic_json({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
+        return return_sanic({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d%H%M")
-    return sanic_json({"code": 200, "msg": "success create knowledge base {}".format(kb_id),
+    return return_sanic({"code": 200, "msg": "success create knowledge base {}".format(kb_id),
                        "data": {"kb_id": kb_id, "kb_name": kb_name, "timestamp": timestamp}})
 
 
@@ -147,23 +151,24 @@ async def delete_knowledge_base(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("delete_knowledge_base %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
     if not_exist_kb_ids:
-        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
+        return return_sanic({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
     
 
     file_ids = safe_get(req, "file_ids", None)
-    if file_ids is not None:        
+    if file_ids is not None:
         valid_file_infos = local_doc_qa.mysql_client.check_file_exist(user_id, kb_id, file_ids)
         if len(valid_file_infos) == 0:
-            return sanic_json({"code": 2004, "msg": "fail, files {} not found".format(file_ids)})
+            return return_sanic({"code": 2004, "msg": "fail, files {} not found".format(file_ids)})
         local_doc_qa.faiss_client.delete_documents(kb_id=kb_id, file_ids=file_ids)
+        local_doc_qa.faiss_client.delete_faiss_cache(kb_ids=[kb_id])    # 删除faiss缓存
         # 删除数据库中的记录
         local_doc_qa.mysql_client.delete_files(kb_id, file_ids)
         
@@ -172,9 +177,10 @@ async def delete_knowledge_base(req: request):
             file_path = os.path.join(UPLOAD_ROOT_PATH, user_id, kb_id, file_id)
             if os.path.exists(file_path):
                 shutil.rmtree(file_path)
-        return sanic_json({"code": 200, "msg": "documents {} delete success".format(file_ids)})
+        return return_sanic({"code": 200, "msg": "documents {} delete success".format(file_ids)})
     else:    
         local_doc_qa.faiss_client.delete_documents(kb_id=kb_id)
+        local_doc_qa.faiss_client.delete_faiss_cache(kb_ids=[kb_id])
         local_doc_qa.mysql_client.delete_knowledge_base(user_id, [kb_id])
 
         # 新增删除content文件
@@ -182,7 +188,7 @@ async def delete_knowledge_base(req: request):
         if os.path.exists(knowledge_content_path):
             shutil.rmtree(knowledge_content_path)
         
-        return sanic_json({"code": 200, "msg": "Knowledge Base {} delete success".format(kb_id)})
+        return return_sanic({"code": 200, "msg": "Knowledge Base {} delete success".format(kb_id)})
 
 
 
@@ -192,14 +198,14 @@ async def document_parser_embedding(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("document_parser_embedding %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     if kb_id[:2] != 'KB':
-        return sanic_json({"code": 2001, "msg": "fail, kb_id must start with 'KB'"})
+        return return_sanic({"code": 2001, "msg": "fail, kb_id must start with 'KB'"})
     file_ids = safe_get(req, 'file_ids')
     file_ids = file_ids.split(',') if file_ids else []
     mode = safe_get(req, 'mode', default='soft')  # soft代表不上传同名文件，strong表示强制上传同名文件
@@ -210,7 +216,7 @@ async def document_parser_embedding(req: request):
     if len(file_ids) != len(files):
         msg = "file_ids与files数量不一致，请检查！"
         debug_logger.info("%s", msg)
-        return sanic_json({"code": 2001, "msg": msg, "data": [{}]})
+        return return_sanic({"code": 2001, "msg": msg, "data": [{}]})
 
     # 检查kb_id是否存在，如果不存在则创建一个
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
@@ -220,7 +226,7 @@ async def document_parser_embedding(req: request):
         kb_name = safe_get(req, 'kb_name', kb_id)
         _kb_id, status = local_doc_qa.mysql_client.new_knowledge_base(kb_id, user_id, kb_name)
         if _kb_id is None:
-            return sanic_json({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
+            return return_sanic({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
         
 
     data = []
@@ -242,16 +248,18 @@ async def document_parser_embedding(req: request):
         exist_files = local_doc_qa.mysql_client.check_file_exist_by_name(user_id, kb_id, file_names)
         exist_file_names = [f[1] for f in exist_files]
 
+    debug_logger.info("exist_file_names: %s", exist_file_names)
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d%H%M")
 
     for file, file_name, file_id in zip(files, file_names, file_ids):
         if file_name in exist_file_names:
+            debug_logger.info("exist_file_names: %s", file_name)
             continue
         file_id, msg = local_doc_qa.mysql_client.add_fileid(user_id, kb_id, file_id, file_name, timestamp)
         debug_logger.info(f"{file_name}, {file_id}, {msg}")
         if (file_id is None):
-            return sanic_json({"code": 2001, "msg": msg, "data": [{}]})
+            return return_sanic({"code": 2001, "msg": msg, "data": [{}]})
         local_file = LocalFile(user_id, kb_id, file, file_id, file_name, local_doc_qa.embeddings)
         local_doc_qa.mysql_client.update_file_path(file_id, local_file.file_path)
         local_files.append(local_file)
@@ -275,7 +283,7 @@ async def document_parser_embedding(req: request):
         debug_logger.info(f"time cost:{t2-t1}")
     except Exception as e:
         debug_logger.warn(f"save api 失败，异常信息：{e}")
-    return sanic_json(return_result)
+    return return_sanic(return_result)
 
 
 
@@ -284,10 +292,10 @@ async def chunk_embedding(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("chunk_embedding %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     file_id = safe_get(req, 'file_id', uuid.uuid4().hex)
@@ -295,7 +303,7 @@ async def chunk_embedding(req: request):
     chunk_datas = safe_get(req, 'chunk_datas')
     debug_logger.info(f"chunk_datas {chunk_datas}")
     if not isinstance(chunk_datas, list):
-        return sanic_json({"code": 2003, "msg": f'输入chunk格式非法！请检查！'})
+        return return_sanic({"code": 2003, "msg": f'输入chunk格式非法！请检查！'})
     
     
     # 检查kb_id是否存在，如果不存在则创建一个
@@ -306,7 +314,7 @@ async def chunk_embedding(req: request):
         kb_name = safe_get(req, 'kb_name', kb_id)
         _kb_id, status = local_doc_qa.mysql_client.new_knowledge_base(kb_id, user_id, kb_name)
         if _kb_id is None:
-            return sanic_json({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
+            return return_sanic({"code": 2004, "msg": "fail, create knowledge base {} failed, must sure kb_id is unique".format(kb_id)})
 
    
     now = datetime.now()
@@ -316,7 +324,7 @@ async def chunk_embedding(req: request):
     file_id, msg = local_doc_qa.mysql_client.add_fileid(user_id, kb_id, file_id, file_name, timestamp)
     debug_logger.info(f"{file_name}, {file_id}, {msg}")
     if file_id is None:
-        return sanic_json({"code": 2004, "msg": msg})
+        return return_sanic({"code": 2004, "msg": msg})
     
     local_file = LocalFile(user_id, kb_id, chunk_datas, file_id, file_name, local_doc_qa.embeddings)    
     local_doc_qa.mysql_client.update_file_path(file_id, local_file.file_path)
@@ -335,7 +343,7 @@ async def chunk_embedding(req: request):
         debug_logger.info(f"time cost:{t2-t1}")
     except Exception as e:
         debug_logger.warn(f"save api 失败，异常信息：{e}")
-    return sanic_json(return_result)
+    return return_sanic(return_result)
 
 
 
@@ -345,10 +353,10 @@ async def document_parser(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.form: {req.form}，request.files: {req.files}请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("document_parser %s", user_id)
     
         
@@ -384,7 +392,7 @@ async def document_parser(req: request):
     except Exception as e:
         debug_logger.warn(f"save api 失败，异常信息：{e}")
         
-    return sanic_json(return_result)
+    return return_sanic(return_result)
     
 
 
@@ -395,19 +403,19 @@ async def question_rag_search(req: request):
     user_id = safe_get(req, 'user_id')
     chat_user_id = user_id
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info('question_rag_search %s', user_id)
 
     kb_ids = safe_get(req, 'kb_ids')
     if kb_ids is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！kb_ids不正确，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！kb_ids不正确，请检查！'})
     
     question = safe_get(req, 'question')
     if question is None or question=="":
-        return sanic_json({"code": 2002, "msg": f'输入非法！question不正确，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！question不正确，请检查！'})
     
     rerank = safe_get(req, 'rerank', default=True)
     merge = safe_get(req, 'merge', default=True)
@@ -418,21 +426,22 @@ async def question_rag_search(req: request):
     debug_logger.info("merge: %s", merge)
 
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, kb_ids)
-    if not_exist_kb_ids:
-        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
+    debug_logger.info(f"not_exist_kb_ids: {not_exist_kb_ids}")
+    if len(not_exist_kb_ids)==len(kb_ids):
+        return return_sanic({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
     
-    faq_kb_ids = [kb + '_FAQ' for kb in kb_ids]
-    not_exist_faq_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, faq_kb_ids)
-    exist_faq_kb_ids = [kb for kb in faq_kb_ids if kb not in not_exist_faq_kb_ids]
-    debug_logger.info("exist_faq_kb_ids: %s", exist_faq_kb_ids)
-    kb_ids += exist_faq_kb_ids
+    # faq_kb_ids = [kb + '_FAQ' for kb in kb_ids]
+    # not_exist_faq_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, faq_kb_ids)
+    # exist_faq_kb_ids = [kb for kb in faq_kb_ids if kb not in not_exist_faq_kb_ids]
+    # debug_logger.info("exist_faq_kb_ids: %s", exist_faq_kb_ids)
+    # kb_ids += exist_faq_kb_ids
 
     file_infos = []
     for kb_id in kb_ids:
         file_infos.extend(local_doc_qa.mysql_client.get_files(user_id, kb_id))
     valid_files = [fi for fi in file_infos if fi[2] == 'green']
     if len(valid_files) == 0:
-        return sanic_json({"code": 200, "msg": "当前知识库为空，请上传文件或等待文件解析完毕", "question": question,
+        return return_sanic({"code": 200, "msg": "当前知识库为空，请上传文件或等待文件解析完毕", "question": question,
                            "response": "All knowledge bases {} are empty or haven't green file, please upload files".format(
                                kb_ids), "source_documents": [{}]})
     else:
@@ -440,27 +449,23 @@ async def question_rag_search(req: request):
                                                                         kb_ids=kb_ids,
                                                                         rerank=rerank,
                                                                         merge=merge)
-
-        
-        chat_data = {'user_id': chat_user_id, 'kb_ids': kb_ids, 'query': question,
-                        'condense_question': question, 'retrieval_documents': retrieval_documents}
         
         source_documents = []
         for doc in retrieval_documents:
             source_documents.append({'metadata': doc.metadata, 'page_content': doc.page_content})
         
-        qa_logger.info("chat_data: %s", chat_data)
-        debug_logger.info("question_rag_search: %s", chat_data)
         
         return_result = {"code": 200, "msg": "success chat", "question": question, 
                             "retrieval_documents": source_documents}
-
+        qa_logger.info("chat_data: %s", return_result)
+        # debug_logger.info("question_rag_search: %s", return_result)
+        
         try:
-            t2 = time.time()    
+            t2 = time.time()   
             date = datetime.now().strftime("%Y-%m-%d")
             save_api_call_to_csv(date, "question_rag_search", req.json, return_result, t2-t1)
             debug_logger.info(f"question_rag_search time cost:{t2-t1}")
-            return sanic_json(return_result)
+            return return_sanic(return_result)
         except Exception as e:
             debug_logger.warn(f"save api 失败，异常信息：{e}")
         
@@ -473,17 +478,17 @@ async def list_kbs(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("list_kbs %s", user_id)
     kb_infos = local_doc_qa.mysql_client.get_knowledge_bases(user_id)
     data = []
     for kb in kb_infos:
         data.append({"kb_id": kb[0], "kb_name": kb[1]})
     debug_logger.info("all kb infos: {}".format(data))
-    return sanic_json({"code": 200, "data": data})
+    return return_sanic({"code": 200, "data": data})
 
 
 
@@ -492,16 +497,16 @@ async def list_docs(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("list_docs %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     debug_logger.info("kb_id: {}".format(kb_id))
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
     if not_exist_kb_ids:
-        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
+        return return_sanic({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids)})
     
     data = []
     file_infos = local_doc_qa.mysql_client.get_files(user_id, kb_id)
@@ -525,7 +530,7 @@ async def list_docs(req: request):
                 data[-1]['question'] = faq_info[2]
                 data[-1]['answer'] = faq_info[3]
 
-    return sanic_json({"code": 200, "msg": "success", "data": {'total': status_count, 'details': data}})
+    return return_sanic({"code": 200, "msg": "success", "data": {'total': status_count, 'details': data}})
 
 
 
@@ -534,24 +539,24 @@ async def delete_docs(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("delete_docs %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     debug_logger.info("kb_id %s", kb_id)
     file_ids = safe_get(req, "file_ids")
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
     if not_exist_kb_ids:
-        return sanic_json({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids[0])})
+        return return_sanic({"code": 2003, "msg": "fail, knowledge Base {} not found".format(not_exist_kb_ids[0])})
     valid_file_infos = local_doc_qa.mysql_client.check_file_exist(user_id, kb_id, file_ids)
     if len(valid_file_infos) == 0:
-        return sanic_json({"code": 2004, "msg": "fail, files {} not found".format(file_ids)})
+        return return_sanic({"code": 2004, "msg": "fail, files {} not found".format(file_ids)})
     local_doc_qa.faiss_client.delete_documents(kb_id=kb_id, file_ids=file_ids)
     # 删除数据库中的记录
     local_doc_qa.mysql_client.delete_files(kb_id, file_ids)
-    return sanic_json({"code": 200, "msg": "documents {} delete success".format(file_ids)})
+    return return_sanic({"code": 200, "msg": "documents {} delete success".format(file_ids)})
 
 
 
@@ -559,10 +564,10 @@ async def get_total_status(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info('get_total_status %s', user_id)
     if not user_id:
         users = local_doc_qa.mysql_client.get_users()
@@ -582,7 +587,7 @@ async def get_total_status(req: request):
                                           'red': len(red_file_infos),
                                           'gray': len(gray_file_infos)}
 
-    return sanic_json({"code": 200, "status": res})
+    return return_sanic({"code": 200, "status": res})
 
 
 
@@ -590,10 +595,10 @@ async def get_files_statu(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("list_docs %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     debug_logger.info("kb_id: {}".format(kb_id))
@@ -626,7 +631,7 @@ async def get_files_statu(req: request):
                 data[-1]['question'] = faq_info[2]
                 data[-1]['answer'] = faq_info[3]
 
-    return sanic_json({"code": 200, "msg": "success", "data": {'total': status_count, 'details': data}})
+    return return_sanic({"code": 200, "msg": "success", "data": {'total': status_count, 'details': data}})
 
 
 
@@ -635,10 +640,10 @@ async def upload_faqs(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("upload_faqs %s", user_id)
     kb_id = safe_get(req, 'kb_id')
     debug_logger.info("kb_id %s", kb_id)
@@ -664,12 +669,12 @@ async def upload_faqs(req: request):
                 file_status[file_name] = "success"
 
     if len(faqs) > 1000:
-        return sanic_json({"code": 2002, "msg": f"fail, faqs too many, The maximum length of each request is 1000."})
+        return return_sanic({"code": 2002, "msg": f"fail, faqs too many, The maximum length of each request is 1000."})
 
     not_exist_kb_ids = local_doc_qa.mysql_client.check_kb_exist(user_id, [kb_id])
     if not_exist_kb_ids:
         msg = "invalid kb_id: {}, please check...".format(not_exist_kb_ids)
-        return sanic_json({"code": 2001, "msg": msg})
+        return return_sanic({"code": 2001, "msg": msg})
 
     data = []
     now = datetime.now()
@@ -685,7 +690,7 @@ async def upload_faqs(req: request):
             debug_logger.info(f"question {ques} already exists, skip it")
             continue
         if len(ques) > 512 or len(faq['answer']) > 2048:
-            return sanic_json({"code": 2003, "msg": f"fail, faq too long, max length of question is 512, answer is 2048."})
+            return return_sanic({"code": 2003, "msg": f"fail, faq too long, max length of question is 512, answer is 2048."})
         content_length = len(ques) + len(faq['answer'])
         file_name = f"FAQ_{ques}.faq"
         file_name = file_name.replace("/", "_").replace(":", "_")  # 文件名中的/和：会导致写入时出错
@@ -704,7 +709,7 @@ async def upload_faqs(req: request):
     asyncio.create_task(local_doc_qa.insert_files_to_faiss(user_id, kb_id, local_files))
 
     msg = "success，后台正在飞速上传文件，请耐心等待"
-    return sanic_json({"code": 200, "msg": msg, "file_status": file_status, "data": data})
+    return return_sanic({"code": 200, "msg": msg, "file_status": file_status, "data": data})
 
 
 
@@ -713,10 +718,10 @@ async def get_qa_info(req: request):
     local_doc_qa: LocalDocSearch = req.app.ctx.local_doc_qa
     user_id = safe_get(req, 'user_id')
     if user_id is None:
-        return sanic_json({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
+        return return_sanic({"code": 2002, "msg": f'输入非法！request.json：{req.json}，请检查！'})
     is_valid = validate_user_id(user_id)
     if not is_valid:
-        return sanic_json({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
+        return return_sanic({"code": 2005, "msg": get_invalid_user_id_msg(user_id=user_id)})
     debug_logger.info("get_qa_info %s", user_id)
     kb_ids = safe_get(req, 'kb_ids')
     query = safe_get(req, 'query')
@@ -725,10 +730,10 @@ async def get_qa_info(req: request):
     # 检查time_end和time_start是否满足2024-10-05的格式
     if time_start:
         if not re.match(r'\d{4}-\d{2}-\d{2}', time_start):
-            return sanic_json({"code": 2002, "msg": f'输入非法！time_start格式错误，time_start: {time_start}，示例：2024-10-05，请检查！'})
+            return return_sanic({"code": 2002, "msg": f'输入非法！time_start格式错误，time_start: {time_start}，示例：2024-10-05，请检查！'})
     if time_end:
         if not re.match(r'\d{4}-\d{2}-\d{2}', time_end):
-            return sanic_json({"code": 2002, "msg": f'输入非法！time_end格式错误，time_end: {time_end}，示例：2024-10-05，请检查！'})
+            return return_sanic({"code": 2002, "msg": f'输入非法！time_end格式错误，time_end: {time_end}，示例：2024-10-05，请检查！'})
     time_range = None
     if time_end and time_start:
         time_range = (time_start, time_end)
@@ -757,12 +762,12 @@ async def get_qa_info(req: request):
             qa_infos = qa_infos[:100]
             page_id = 0
         elif page_id >= pages:
-            return sanic_json({"code": 2002, "msg": f'输入非法！page_id超过最大值，page_id: {page_id}，最大值：{pages - 1}，请检查！'})
+            return return_sanic({"code": 2002, "msg": f'输入非法！page_id超过最大值，page_id: {page_id}，最大值：{pages - 1}，请检查！'})
         else:
             msg = f"检索到的Log数超过100，需要分页返回，总数为{len(qa_infos)}, page范围：[0, {pages - 1}], 本次返回page_id为{page_id}的数据"
             qa_infos = qa_infos[page_id * 100:(page_id + 1) * 100]
     else:
         msg = f"检索到的Log数为{len(qa_infos)}，一次返回所有数据"
         page_id = 0
-    return sanic_json({"code": 200, "msg": msg, "page_id": page_id, "qa_infos": qa_infos})
+    return return_sanic({"code": 200, "msg": msg, "page_id": page_id, "qa_infos": qa_infos})
 

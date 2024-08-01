@@ -36,7 +36,7 @@ def new_knowledge_base(host, port):
         "Content-Type": "application/json",
     }
 
-    payload = {"user_id": user_id, "kb_id": kb_id}
+    payload = {"user_id": user_id, "kb_id": kb_id, "kb_name": kb_id}
     # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c2", "kb_name": "残联政策"}
     # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c3", "kb_name": "发改局政策文件"}
     # payload = {"user_id": "zzp", "kb_id": "KB6dae785cdd5d47a997e890521acbe1c4", "kb_name": "区公安分局“答”板块"}
@@ -52,7 +52,7 @@ def new_knowledge_base(host, port):
 
 
 def delete_knowledge_base(host, port):
-    global user_id, kb_id
+    global user_id, kb_id, file_id
     if user_id == "" or kb_id=="":
         raise ValueError("user_id or kb_id is empty")
     url = f"http://{host}:{port}/api/qanything/delete_knowledge_base"
@@ -61,6 +61,8 @@ def delete_knowledge_base(host, port):
     }
 
     payload = {"user_id": user_id, "kb_id": kb_id}
+    if file_id!="":
+        payload["file_ids"]=[file_id]
     print("prompt:", payload)
 
     try:
@@ -294,6 +296,14 @@ def question_rag_search(host, port):
         print("问题：", question)
 
     payload = {"user_id": user_id, "question": question, "kb_ids": [kb_id], "merge": False}
+    
+    # payload["user_id"] = "3ae64850-8382-42f6-b2f7-31670b4321ef"
+    # payload["kb_ids"] = [
+    #                      "KB1a7d64fc34e742d0bf63f31a6b5a12071",
+    #                      "KB1e82a76c1cba4b1ab89b37f97dd794271",
+    #                      "KB4dc705cedb3b4e7f9e80c06aac1480751",
+    #                      "KB6efcb80d7d8e41559d60e73cf99577be1",]
+    #                     #  "KB12345"]
     print("payload:",payload)
 
     try:
@@ -332,7 +342,7 @@ def upload_faqs(host, port):
         "user_id": user_id, 
         "kb_id": kb_id, 
         "faqs": [{"question": "如何使用python", "answer": "python是一种编程语言，可以用来开发各种应用程序。参考教程：https://www.runoob.com/python3/python3-tutorial.html"}, 
-                 {"question": "如何使用docker", "answer": "Docker是一个开源的应用容器引擎，参考教程：https://www.runoob.com/docker/docker-tutorial.html"}]}
+                 {"question": "如何使用docker", "answer": "Docker是一个开源的应用容器引擎，参考教程：https://www.runoob.com/docker/docker-tutorial.html"}]}
     print("prompt:", payload)
 
     try:

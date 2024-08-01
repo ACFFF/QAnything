@@ -40,25 +40,60 @@ class SelfInMemoryDocstore(InMemoryDocstore):
 # def load_vector_store(faiss_index_path, embeddings):
 #     debug_logger.info(f'load faiss index: {faiss_index_path}')
 #     return FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+    
 
 
 # 存到内存中，减少读取时间
 from collections import OrderedDict
 faiss_cache_obj=OrderedDict()
-def load_vector_store(faiss_index_path, embeddings):
-    if faiss_index_path in faiss_cache_obj.keys():
-        debug_logger.info(f'load faiss index in cache: {faiss_index_path}')
-        faiss_cache_obj.move_to_end(faiss_index_path)
-        return faiss_cache_obj[faiss_index_path]
+def load_vector_store(kb_ids, embeddings):
 
-    debug_logger.info(f'load faiss index: {faiss_index_path}')
-    faiss_cache_obj[faiss_index_path] = FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+    sorted_kb_ids = sorted(kb_ids, key=lambda s: sum(ord(c) for c in s))
+    debug_logger.info(f'sorted_kb_ids: {sorted_kb_ids}')
+    sorted_kb_ids_str=str(sorted_kb_ids)
+
+    if sorted_kb_ids_str in faiss_cache_obj.keys():
+        debug_logger.info(f'load faiss index in cache: {sorted_kb_ids}')
+        faiss_cache_obj.move_to_end(sorted_kb_ids_str)
+        return faiss_cache_obj[sorted_kb_ids_str]
+
+    debug_logger.info(f'load faiss index: {sorted_kb_ids}')
+
+    faiss_client = None
+    for kb_id in sorted_kb_ids:
+        faiss_index_path = os.path.join(FAISS_LOCATION, kb_id, 'faiss_index')
+        if os.path.exists(faiss_index_path):
+            faiss_client_tmp: FAISS = FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+        else:
+            faiss = dependable_faiss_import()
+            index = faiss.IndexFlatL2(768)
+            docstore = SelfInMemoryDocstore()
+            debug_logger.info(f'init FAISS kb_id: {kb_id}')
+            faiss_client_tmp: FAISS = FAISS(embeddings, index, docstore, index_to_docstore_id={})
+        if faiss_client is None:
+            faiss_client = faiss_client_tmp
+        else:
+            try:
+                faiss_client.merge_from(faiss_client_tmp)
+                debug_logger.info(f'merge FAISS kb_id: {kb_id}')
+            except ValueError:
+                raise ValueError(f'遗留数据与新版本不匹配，请删除{os.path.dirname(FAISS_LOCATION)}文件夹（清空所有知识库）后重新启动服务并重新创建知识库')
+    faiss_cache_obj[sorted_kb_ids_str] = faiss_client
 
 
     if len(faiss_cache_obj) > FAISS_CACHE_SIZE:
         faiss_index_path_to_remove = faiss_cache_obj.popitem(last=False)[0]
         debug_logger.info(f'remove faiss index from cache: {faiss_index_path_to_remove}')
-    return faiss_cache_obj[faiss_index_path]
+    
+    return faiss_cache_obj[sorted_kb_ids_str]
+
+def delete_faiss_cache_store(kb_ids):
+    for kb_id in kb_ids:
+        all_cache_keys = faiss_cache_obj.keys()
+        for sorted_kb_ids_str in all_cache_keys:    # 删除所有包含该kb_id的缓存
+            if kb_id in sorted_kb_ids_str:
+                debug_logger.info(f'delete faiss index from cache: {sorted_kb_ids_str}')
+                del faiss_cache_obj[sorted_kb_ids_str]
 
 
 class FaissClient:
@@ -71,33 +106,40 @@ class FaissClient:
 
     def _load_kb_to_memory(self, kb_ids):
         debug_logger.info(f'_load_kb_to_memory kb_ids: {kb_ids}')
+        debug_logger.info(f'faiss_cache_obj.keys(): {faiss_cache_obj.keys()}')
         self.kb_ids = kb_ids
         self.faiss_client = None
-        for kb_id in kb_ids:
-            faiss_index_path = os.path.join(FAISS_LOCATION, kb_id, 'faiss_index')
-            if os.path.exists(faiss_index_path):
-                faiss_client: FAISS = load_vector_store(faiss_index_path, self.embeddings)
-            else:
-                faiss = dependable_faiss_import()
-                index = faiss.IndexFlatL2(768)
-                docstore = SelfInMemoryDocstore()
-                debug_logger.info(f'init FAISS kb_id: {kb_id}')
-                faiss_client: FAISS = FAISS(self.embeddings, index, docstore, index_to_docstore_id={})
-            if self.faiss_client is None:
-                self.faiss_client = faiss_client
-            else:
-                try:
-                    self.faiss_client.merge_from(faiss_client)
-                    debug_logger.info(f'merge FAISS kb_id: {kb_id}')
-                except ValueError:
-                    raise ValueError(f'遗留数据与新版本不匹配，请删除{os.path.dirname(FAISS_LOCATION)}文件夹（清空所有知识库）后重新启动服务并重新创建知识库')
+        self.faiss_client: FAISS = load_vector_store(kb_ids, self.embeddings)
+        # for kb_id in kb_ids:
+        #     faiss_index_path = os.path.join(FAISS_LOCATION, kb_id, 'faiss_index')
+        #     if os.path.exists(faiss_index_path):
+        #         faiss_client: FAISS = load_vector_store(faiss_index_path, self.embeddings)
+        #     else:
+        #         faiss = dependable_faiss_import()
+        #         index = faiss.IndexFlatL2(768)
+        #         docstore = SelfInMemoryDocstore()
+        #         debug_logger.info(f'init FAISS kb_id: {kb_id}')
+        #         faiss_client: FAISS = FAISS(self.embeddings, index, docstore, index_to_docstore_id={})
+        #     if self.faiss_client is None:
+        #         self.faiss_client = faiss_client
+        #     else:
+        #         try:
+        #             self.faiss_client.merge_from(faiss_client)
+        #             debug_logger.info(f'merge FAISS kb_id: {kb_id}')
+        #         except ValueError:
+        #             raise ValueError(f'遗留数据与新版本不匹配，请删除{os.path.dirname(FAISS_LOCATION)}文件夹（清空所有知识库）后重新启动服务并重新创建知识库')
         debug_logger.info(f'FAISS load kb_ids: {kb_ids}')
+    
+    def delete_faiss_cache(self, kb_ids):
+        debug_logger.info(f'delete_faiss_cache kb_ids: {kb_ids}')
+        delete_faiss_cache_store(kb_ids)
+
 
     async def search(self, kb_ids, query, filter: Optional[Union[Callable, Dict[str, Any]]] = None,
                      top_k=VECTOR_SEARCH_TOP_K, merge: bool = True):
         if self.faiss_client is None or self.kb_ids != kb_ids:
             self._load_kb_to_memory(kb_ids)
-        # filter = {'page': 1}
+        
         if filter is None:
             filter = {}
         debug_logger.info(f'FAISS search: {query}, {filter}, {top_k}')
@@ -106,7 +148,7 @@ class FaissClient:
                                                                                 score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD)
         debug_logger.info(f'FAISS search result number: {len(docs_with_score)}')
         for doc, score in docs_with_score:
-            doc.metadata['score'] = score
+            doc.metadata['score'] = float(score)
         docs = [doc for doc, score in docs_with_score]
         # docs_with_score = self.merge_docs(docs)
         # return docs_with_score
@@ -157,7 +199,6 @@ class FaissClient:
                     if ADD_FILENAME_TO_EMBEDDING and file_name not in merged_docs[-1].page_content:
                         merged_docs[-1].page_content = file_name + merged_docs[-1].page_content
                         debug_logger.warn(f"Manual add file name in doc page content!{doc.page_content[:50]}{doc.metadata}")
-            
 
         return merged_docs
 
