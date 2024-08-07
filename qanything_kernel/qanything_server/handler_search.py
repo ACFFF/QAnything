@@ -383,6 +383,9 @@ async def document_parser(req: request):
     debug_logger.info("document_parser: %s", parser_documents)
     return_result = {"code": 200, "msg": "document parser success",
                         "parser_documents": parser_documents}
+    knowledge_content_path = os.path.join(UPLOAD_ROOT_PATH,user_id, kb_id)
+    if os.path.exists(knowledge_content_path):
+        shutil.rmtree(knowledge_content_path)
 
     try:
         t2 = time.time()    

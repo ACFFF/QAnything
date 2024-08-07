@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# cd /workspace/qanything_local || exit  #部署
 update_or_append_to_env() {
   local key=$1
   local value=$2
@@ -23,6 +24,7 @@ qanything_port=8777
 device="gpu"
 device_id=0
 workers=1
+use_paddleocr=true
 
 # 使用getopts解析命令行参数
 while getopts ":p:d:i:w:" opt; do
@@ -53,15 +55,27 @@ echo "qanything_port: $qanything_port"
 echo "workers: $workers"
 
 
-
-echo -e "即将启动后端服务"
-echo "运行qanything-server的命令是："
-echo "CUDA_VISIBLE_DEVICES=$device_id python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port --workers $workers --device $device --device_id $device_id"
+if [ "$use_paddleocr" == "true" ]; then
+    echo "use paddle ocr"
+    if [ "$device" == "gpu" ]; then
+        echo "Using GPU for PaddleOCR"
+        export OCR_USE_GPU=True
+    fi
+    nohup python3 -u qanything_kernel/dependent_server/ocr_serve/ocr_server.py > ./logs/debug_logs/ocr_server.log 2>&1 &
+    echo "The ocr service is ready!"
+    echo "OCR服务已就绪!"
+    
+    python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port \
+    --device $device --device_id $device_id --workers $workers --use_paddleocr 
+else
+    echo "use local ocr"
+    python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port \
+    --device $device --device_id $device_id --workers $workers
+fi
 
 sleep 1
 # 启动qanything-server服务
-python3 -m qanything_kernel.qanything_server.sanic_api_search --host 0.0.0.0 --port $qanything_port \
-    --device $device --device_id $device_id --workers $workers
+
     
 
 

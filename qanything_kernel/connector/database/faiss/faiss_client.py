@@ -2,7 +2,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.docstore import InMemoryDocstore
 from langchain_core.documents import Document
 from qanything_kernel.configs.model_config import VECTOR_SEARCH_TOP_K, FAISS_LOCATION, FAISS_CACHE_SIZE, ADD_FILENAME_TO_EMBEDDING, \
-    VECTOR_SEARCH_SCORE_THRESHOLD
+    VECTOR_SEARCH_SCORE_THRESHOLD, MERGE_TOKEN_LENGTH
 from typing import Optional, Union, Callable, Dict, Any, List, Tuple
 from langchain_community.vectorstores.faiss import dependable_faiss_import
 from qanything_kernel.utils.custom_log import debug_logger
@@ -174,7 +174,7 @@ class FaissClient:
                     debug_logger.warn(f"Manual add file name in doc page content!{doc.page_content[:50]}{doc.metadata}")
             else:
                 if merged_docs[-1].metadata['chunk_id'] == doc.metadata['chunk_id'] - 1:
-                    if num_tokens(merged_docs[-1].page_content + doc.page_content) <= 800:
+                    if num_tokens(merged_docs[-1].page_content + doc.page_content) <= MERGE_TOKEN_LENGTH:
                         if ADD_FILENAME_TO_EMBEDDING:
                             file_name_tmp = doc.metadata['file_name']
                             file_name_tmp = "<<"+os.path.splitext(file_name_tmp)[0]+">>:\n"

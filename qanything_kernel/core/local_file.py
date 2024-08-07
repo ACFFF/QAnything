@@ -194,11 +194,10 @@ class LocalFile:
                     loader = UnstructuredPaddlePDFLoader(self.file_path, ocr_engine, self.use_cpu)
                     texts_splitter = ChineseTextSplitter(pdf=True, sentence_size=sentence_size)
                     docs = loader.load_and_split(texts_splitter)
-                    # print("docs:", docs)
                 else:
                     try:
                         from qanything_kernel.utils.loader.self_pdf_loader import PdfLoader
-                        loader = PdfLoader(filename=self.file_path, root_dir=os.path.dirname(self.file_path))
+                        loader = PdfLoader(filename=self.file_path, save_dir=os.path.dirname(self.file_path))
                         markdown_dir = loader.load_to_markdown()
                         docs = convert_markdown_to_langchaindoc(markdown_dir)
                         docs = self.pdf_process(docs)
@@ -246,7 +245,7 @@ class LocalFile:
             # 不是csv，xlsx和FAQ的文件，需要再次分割
             if not self.file_path.lower().endswith(".csv") and not self.file_path.lower().endswith(".xlsx") and not self.file_path == 'FAQ':
                 new_docs = []
-                min_length = 600
+                min_length = 200
                 for doc in docs:
                     if not new_docs:
                         new_docs.append(doc)
@@ -318,10 +317,10 @@ class LocalFile:
             else:
                 try:
                     from qanything_kernel.utils.loader.self_pdf_loader import PdfLoader
-                    loader = PdfLoader(filename=self.file_path, root_dir=os.path.dirname(self.file_path))
+                    loader = PdfLoader(filename=self.file_path, save_dir=os.path.dirname(self.file_path))
                     markdown_dir = loader.load_to_markdown()
                     docs = convert_markdown_to_langchaindoc(markdown_dir)
-                    docs = self.pdf_process(docs)
+                    # docs = self.pdf_process(docs)
                 except Exception as e:
                     debug_logger.warning(f'Error in Powerful PDF parsing: {e}, use fast PDF parser instead.')
                     loader = UnstructuredPaddlePDFLoader(self.file_path, ocr_engine, self.use_cpu)

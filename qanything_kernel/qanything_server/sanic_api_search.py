@@ -28,8 +28,10 @@ parser.add_argument('--workers', dest='workers', default=4, type=int, help='sani
 parser.add_argument('--device', dest='device', default='npu', help='显卡设备，可以设置为npu, gpu, cpu')
 parser.add_argument('--device_id', dest='device_id', default='0', help='cuda device id for qanything server')
 parser.add_argument('--backend', dest='backend', default='onnx', help='运行模型的推理后端，可以设置为onnx, torch')
-parser.add_argument('--offline', dest='offline', default=False, help='offline mode')
+parser.add_argument('--offline', action='store_true', help='offline mode')
+parser.add_argument('--use_paddleocr', action='store_true', help='是否使用paddleocr')
 args = parser.parse_args()
+print(args)
 
 # 针对离线推理环境，需要设置tiktoken以及unstructured库部分组件联网检查的问题
 if args.offline:

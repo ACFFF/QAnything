@@ -16,10 +16,7 @@ from .local_file import LocalFile
 import traceback
 import base64
 import numpy as np
-import platform
-import cv2
-import copy
-
+import requests
 
 class LocalDocSearch:
     def __init__(self):
@@ -33,21 +30,40 @@ class LocalDocSearch:
         self.ocr_reader: OCRQAnything = None
         self.mode: str = None
         self.model: str = None
+        self.use_paddleocr = False
+        self.ocr_url = 'http://127.0.0.1:8010/ocr'
 
     def get_ocr_result(self, input: dict):
-        img_file = input['img64']
-        height = input['height']
-        width = input['width']
-        channels = input['channels']
-        binary_data = base64.b64decode(img_file)
-        img_array = np.frombuffer(binary_data, dtype=np.uint8).reshape((height, width, channels))
-        ocr_res = self.ocr_reader(img_array)
-        res = [line for line in ocr_res if line]
-        return res
+        if self.use_paddleocr:
+            response = requests.post(self.ocr_url, json=input, timeout=60)
+            response.raise_for_status()  # 如果请求返回了错误状态码，将会抛出异常
+            result = response.json()['results']
+            if result[0] is not None:
+                result = [i[1][0] for line in result for i in line]
+            else:
+                result = []
+            debug_logger.info(f"paddle ocr result: {result}")
+            return result
+        else:
+            img_file = input['img64']
+            height = input['height']
+            width = input['width']
+            channels = input['channels']
+            binary_data = base64.b64decode(img_file)
+            img_array = np.frombuffer(binary_data, dtype=np.uint8).reshape((height, width, channels))
+            ocr_res = self.ocr_reader(img_array)
+            if len(ocr_res)>0:
+                ocr_res = [line for line in ocr_res if line]
+            else:
+                ocr_res = []
+            res = [line for line in ocr_res if line]
+            debug_logger.info(f"local ocr result: {res}")
+            return res
 
     def init_cfg(self, args):
         self.rerank_top_k = 3
         self.device = args.device
+        self.use_paddleocr = args.use_paddleocr
         if not self.device=="cpu":
             self.device = self.device+":"+str(args.device_id)
         
@@ -68,8 +84,11 @@ class LocalDocSearch:
             raise ValueError(f"error input backend: {args.backend}")
         
         self.mysql_client = KnowledgeBaseManager()
-        self.ocr_reader = OCRQAnything(model_dir=OCR_MODEL_PATH, device="cpu")  # 省显存
-        debug_logger.info(f"OCR DEVICE: {self.ocr_reader.device}")
+        if not self.use_paddleocr:
+            self.ocr_reader = OCRQAnything(model_dir=OCR_MODEL_PATH, device=self.device)  # 省显存
+            debug_logger.info(f"OCR DEVICE: {self.ocr_reader.device}")
+        else:
+            debug_logger.info(f"use paddleocr server api")
         self.faiss_client = FaissClient(self.mysql_client, self.embeddings)
 
     async def insert_files_to_faiss(self, user_id, kb_id, local_files: List[LocalFile]):
@@ -295,45 +314,6 @@ class LocalDocSearch:
 
         return source_documents
 
-    # def reprocess_source_documents(self, query: str,
-    #                                source_docs: List[Document],
-    #                                history: List[str],
-    #                                prompt_template: str) -> List[Document]:
-    #     # 组装prompt,根据max_token
-    #     query_token_num = self.llm.num_tokens_from_messages([query])
-    #     history_token_num = self.llm.num_tokens_from_messages([x for sublist in history for x in sublist])
-    #     template_token_num = self.llm.num_tokens_from_messages([prompt_template])
-
-    #     limited_token_nums = self.llm.token_window - self.llm.max_token - self.llm.offcut_token - query_token_num - history_token_num - template_token_num
-    #     new_source_docs = []
-    #     total_token_num = 0
-    #     for doc in source_docs:
-    #         doc_token_num = self.llm.num_tokens_from_docs([doc])
-    #         if total_token_num + doc_token_num <= limited_token_nums:
-    #             new_source_docs.append(doc)
-    #             total_token_num += doc_token_num
-    #         else:
-    #             remaining_token_num = limited_token_nums - total_token_num
-    #             doc_content = doc.page_content
-    #             doc_content_token_num = self.llm.num_tokens_from_messages([doc_content])
-    #             while doc_content_token_num > remaining_token_num:
-    #                 # Truncate the doc content to fit the remaining tokens
-    #                 if len(doc_content) > 2 * self.llm.truncate_len:
-    #                     doc_content = doc_content[self.llm.truncate_len: -self.llm.truncate_len]
-    #                 else:  # 如果最后不够truncate_len长度的2倍，说明不够切了，直接赋值为空
-    #                     doc_content = ""
-    #                     break
-    #                 doc_content_token_num = self.llm.num_tokens_from_messages([doc_content])
-    #             doc.page_content = doc_content
-    #             new_source_docs.append(doc)
-    #             break
-
-    #     debug_logger.info(f"limited token nums: {limited_token_nums}")
-    #     debug_logger.info(f"template token nums: {template_token_num}")
-    #     debug_logger.info(f"query token nums: {query_token_num}")
-    #     debug_logger.info(f"history token nums: {history_token_num}")
-    #     debug_logger.info(f"new_source_docs token nums: {self.llm.num_tokens_from_docs(new_source_docs)}")
-    #     return new_source_docs
 
     def generate_prompt(self, query, source_docs, prompt_template):
         context = "\n".join([doc.page_content for doc in source_docs])
