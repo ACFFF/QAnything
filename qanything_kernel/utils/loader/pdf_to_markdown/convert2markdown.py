@@ -26,6 +26,8 @@ def json2markdown(json_dir, markdown_dir):
             pdf.append('![equation]'+'({}.jpg)'.format(type) + '\n')
         else:
             para = text.split('@@')[0] + '\n'
+            if para=="\n":
+                continue
             pdf.append(para)
             if para_before:
                 if any([re.match(p, para_before[-2]) for p in before_patt]) and any([re.match(p, para[0]) for p in after_patt]):
@@ -46,5 +48,5 @@ def json2markdown(json_dir, markdown_dir):
 
 
 if __name__ =='__main__':
-    json_dir = '/ssd8/exec/qinhaibo/code/RAG/release/git/document-layout-parser/table_test.json'
-    json2markdown(json_dir)
+    json_dir = 'QANY_DB/content/tsh/KB1234/86996323ae634c4eb1f598ad3337487e/成都市残疾儿童康复救助工作实施办法.json'
+    json2markdown(json_dir, "./markdown_dir.md")
